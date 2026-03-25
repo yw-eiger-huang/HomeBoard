@@ -30,3 +30,13 @@ Single-file HTML5 canvas application (`Code/board_viz.html`) with no frameworks 
 - `CEILING = 2.5` m (room height)
 
 **Spec:** `Spec/20260325.md` contains the full technical specification in Traditional Chinese, including formulas for all point coordinates and visual design requirements.
+
+## Deployment
+
+Hosted on **GitHub Pages** at:
+**https://yw-eiger-huang.github.io/HomeBoard/**
+
+- GitHub repo: https://github.com/yw-eiger-huang/HomeBoard
+- Branch: `main`, served from repo root (`/`)
+- `index.html` at the root mirrors `Code/board_viz.html` with CSS/JS paths updated to `Code/board_viz.css` and `Code/board_viz.js`
+- To deploy changes: commit and push to `main` — GitHub Pages updates automatically within ~1 minute
