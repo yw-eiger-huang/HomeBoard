@@ -40,3 +40,7 @@ Hosted on **GitHub Pages** at:
 - Branch: `main`, served from repo root (`/`)
 - `index.html` at the root mirrors `Code/board_viz.html` with CSS/JS paths updated to `Code/board_viz.css` and `Code/board_viz.js`
 - To deploy changes: commit and push to `main` — GitHub Pages updates automatically within ~1 minute
+
+## Working Rules
+
+- **Do not commit or push** unless explicitly asked by the user.
