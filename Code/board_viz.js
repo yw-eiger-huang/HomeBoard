@@ -4,6 +4,7 @@ const ctx = canvas.getContext('2d');
 const BOARD_LEN = 3.048, FOLD_LEN = 0.65, MAIN_LEN = BOARD_LEN - FOLD_LEN;
 const CEIL_H = 2.5, T = 0.05, HT = T / 2;
 const LABEL_RED = '#ff4d4d';
+const GRAY_DASH = '#8888a0';
 const FS = { label: 15, dim: 13, room: 12, seg: 12 };
 
 // A wall-side edge fixed: bottom of wall-side edge touches wall at 40°
@@ -14,7 +15,14 @@ const AY   = CEIL_H; // 2.5
 const HX = 0, HY = CEIL_H;
 const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
 
-let params = { angle: 40, showDims: true, showFold: true, showArc: true, showQuarter: true };
+// Rigid bar lengths from H→M and M→G, computed at angle=0
+// At angle=0: ddx=0, ddy=-1 → G0 = (AX_W, AY - (3/4)*MAIN_LEN)
+const G0_RIG_X = AX_W;
+const G0_RIG_Y = AY - (3 / 4) * MAIN_LEN;
+const LEN_HM_RIG = Math.hypot((HX + G0_RIG_X) / 2 - HX, (HY + G0_RIG_Y) / 2 - HY);
+const LEN_MG_RIG = LEN_HM_RIG; // M0 is midpoint → equal lengths
+
+let params = { angle: 40, showDims: true, showFold: true, showQuarter: true };
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 // Board direction (wall-side edge, from A downward toward wall):
@@ -87,9 +95,30 @@ function getGeom() {
   const GX = quarters[2].x, GY = quarters[2].y;
   const HG = Math.hypot(HX - GX, HY - GY);
 
+  // Rigid junction M: two bars (H→M, M→G) with fixed lengths from angle=0
+  // Solved via two-circle intersection; bends toward A when angle > 0
+  let MX, MY;
+  const dHG = Math.hypot(GX - HX, GY - HY);
+  if (dHG < 0.0001) {
+    MX = HX; MY = HY;
+  } else {
+    const a_rig = (LEN_HM_RIG * LEN_HM_RIG - LEN_MG_RIG * LEN_MG_RIG + dHG * dHG) / (2 * dHG);
+    const h_rig = Math.sqrt(Math.max(0, LEN_HM_RIG * LEN_HM_RIG - a_rig * a_rig));
+    const pmx = HX + a_rig * (GX - HX) / dHG;
+    const pmy = HY + a_rig * (GY - HY) / dHG;
+    const perpX = -(GY - HY) / dHG;
+    const perpY =  (GX - HX) / dHG;
+    // Pick the side toward A: sign of (G-H) × (A-H)
+    const crossA = (GX - HX) * (AY - HY) - (GY - HY) * (AX_W - HX);
+    MX = crossA >= 0 ? pmx + h_rig * perpX : pmx - h_rig * perpX;
+    MY = crossA >= 0 ? pmy + h_rig * perpY : pmy - h_rig * perpY;
+  }
+  const MA = Math.hypot(Aw.x - MX, Aw.y - MY);
+  const ME = Math.hypot(quarters[0].x - MX, quarters[0].y - MY);
+
   return { Aw,Ao,Ac, Bw,Bo,Bc,Bfo, Cw,Co, Dw,Do,
            boardDir, foldDir, fdx,fdy, fnx,fny,
-           quarters, GX,GY, HG };
+           quarters, GX,GY, HG, MX,MY,MA,ME };
 }
 
 // ── Clamp logic ──────────────────────────────────────────────────────────────
@@ -120,8 +149,8 @@ angleSlider.addEventListener('input', () => {
 });
 angleValEl.textContent = '40°';
 
-['togDims','togFold','togArc','togQuarter'].forEach((id,i)=>{
-  const keys=['showDims','showFold','showArc','showQuarter'];
+['togDims','togFold','togQuarter'].forEach((id,i)=>{
+  const keys=['showDims','showFold','showQuarter'];
   document.getElementById(id).addEventListener('click',function(){
     params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]); draw();
   });
@@ -182,27 +211,7 @@ function draw() {
   ctx.beginPath();ctx.moveTo(tx(0),ty(0));ctx.lineTo(tx(0),ty(CEIL_H));ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── Fold arc (D sweeping 0~150° fold range) ──
-  if(params.showFold && params.showArc){
-    const steps=60;
-    ctx.strokeStyle='rgba(122,232,176,0.22)'; ctx.lineWidth=1.5*dpr;
-    ctx.setLineDash([3*dpr,4*dpr]);
-    for(let i=0;i<=steps;i++){
-      const fd=g.boardDir-i*(5*Math.PI/6)/steps;
-      const ex=g.Bw.x+FOLD_LEN*Math.cos(fd), ey=g.Bw.y+FOLD_LEN*Math.sin(fd);
-      if(i===0){ctx.beginPath();ctx.moveTo(tx(ex),ty(ey));}else ctx.lineTo(tx(ex),ty(ey));
-    }
-    ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle='rgba(122,232,176,0.04)';
-    ctx.beginPath(); ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));
-    for(let i=0;i<=steps;i++){
-      const fd=g.boardDir-i*(5*Math.PI/6)/steps;
-      ctx.lineTo(tx(g.Bw.x+FOLD_LEN*Math.cos(fd)), ty(g.Bw.y+FOLD_LEN*Math.sin(fd)));
-    }
-    ctx.closePath(); ctx.fill();
-  }
-
-  // ── Main board polygon: Aw→Bw→Bo→Ao ──
+// ── Main board polygon: Aw→Bw→Bo→Ao ──
   ctx.lineJoin='round'; ctx.lineCap='round';
   ctx.beginPath();
   ctx.moveTo(tx(g.Aw.x),ty(g.Aw.y));
@@ -215,9 +224,9 @@ function draw() {
 
   // Ghost C extension (dashed)
   ctx.setLineDash([5*dpr,5*dpr]); ctx.lineWidth=1*dpr;
-  ctx.strokeStyle='rgba(196,137,74,0.3)';
+  ctx.strokeStyle='rgba(136,136,160,0.35)';
   ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Cw.x),ty(g.Cw.y));ctx.stroke();
-  ctx.strokeStyle='rgba(196,137,74,0.2)';
+  ctx.strokeStyle='rgba(136,136,160,0.2)';
   ctx.beginPath();ctx.moveTo(tx(g.Bo.x),ty(g.Bo.y));ctx.lineTo(tx(g.Co.x),ty(g.Co.y));ctx.stroke();
   ctx.setLineDash([]);
 
@@ -234,16 +243,45 @@ function draw() {
   }
 
   // Center line (dashed, main board only)
-  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1*dpr;
+  ctx.strokeStyle='rgba(136,136,160,0.22)'; ctx.lineWidth=1*dpr;
   ctx.setLineDash([4*dpr,4*dpr]);
   ctx.beginPath();ctx.moveTo(tx(g.Ac.x),ty(g.Ac.y));ctx.lineTo(tx(g.Bc.x),ty(g.Bc.y));ctx.stroke();
   ctx.setLineDash([]);
 
   // ── H→G dashed distance ──
   if(params.showQuarter){
-    ctx.strokeStyle='#ffffff55'; ctx.lineWidth=1.5*dpr;
+    ctx.strokeStyle=GRAY_DASH+'66'; ctx.lineWidth=1.5*dpr;
     ctx.setLineDash([6*dpr,5*dpr]);
     ctx.beginPath();ctx.moveTo(tx(HX),ty(HY));ctx.lineTo(tx(g.GX),ty(g.GY));ctx.stroke();
+    // ── H→M and M→G rigid bars (solid lines) ──
+    ctx.strokeStyle = '#90d8c0';
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.setLineDash([]);
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tx(HX),    ty(HY));
+    ctx.lineTo(tx(g.MX),  ty(g.MY));
+    ctx.lineTo(tx(g.GX),  ty(g.GY));
+    ctx.stroke();
+
+    // Length labels on H-M and M-G
+    {
+      const lfs = FS.dim * dpr;
+      ctx.font = `${lfs}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      const rigLbl = (LEN_HM_RIG * 100).toFixed(0) + 'cm';
+      // H-M midpoint
+      const hm_mx = tx((HX + g.MX) / 2), hm_my = ty((HY + g.MY) / 2);
+      const tw_hm = ctx.measureText(rigLbl).width + 8 * dpr;
+      ctx.fillStyle = '#0e0f12'; ctx.fillRect(hm_mx - tw_hm/2, hm_my - lfs*0.85, tw_hm, lfs*1.3);
+      ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, hm_mx, hm_my + lfs*0.35);
+      // M-G midpoint
+      const mg_mx = tx((g.MX + g.GX) / 2), mg_my = ty((g.MY + g.GY) / 2);
+      const tw_mg = ctx.measureText(rigLbl).width + 8 * dpr;
+      ctx.fillStyle = '#0e0f12'; ctx.fillRect(mg_mx - tw_mg/2, mg_my - lfs*0.85, tw_mg, lfs*1.3);
+      ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, mg_mx, mg_my + lfs*0.35);
+    }
+
     ctx.setLineDash([]);
     const mx=(HX+g.GX)/2, my=(HY+g.GY)/2;
     const fs=FS.dim*dpr;
@@ -252,7 +290,25 @@ function draw() {
     const tw=ctx.measureText(lbl).width+8*dpr;
     ctx.textAlign='center';
     ctx.fillStyle='#0e0f12'; ctx.fillRect(tx(mx)-tw/2,ty(my)-fs*0.85,tw,fs*1.3);
-    ctx.fillStyle='#ffffff88'; ctx.fillText(lbl,tx(mx),ty(my)+fs*0.35);
+    ctx.fillStyle=GRAY_DASH; ctx.fillText(lbl,tx(mx),ty(my)+fs*0.35);
+
+    // ── G-H midpoint M → A dashed distance ──
+    function dashedDistLine(x1,y1,x2,y2,lbl,color){
+      ctx.strokeStyle=color; ctx.lineWidth=1.2*dpr;
+      ctx.setLineDash([5*dpr,4*dpr]);
+      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+      ctx.setLineDash([]);
+      const mx2=(x1+x2)/2, my2=(y1+y2)/2;
+      const tw2=ctx.measureText(lbl).width+8*dpr;
+      ctx.textAlign='center';
+      ctx.fillStyle='#0e0f12'; ctx.fillRect(mx2-tw2/2,my2-fs*0.85,tw2,fs*1.3);
+      ctx.fillStyle=color; ctx.fillText(lbl,mx2,my2+fs*0.35);
+    }
+    ctx.font=`${fs}px 'JetBrains Mono', monospace`;
+    dashedDistLine(tx(g.MX),ty(g.MY), tx(g.Aw.x),ty(g.Aw.y),
+                   (g.MA*100).toFixed(0)+'cm', GRAY_DASH);
+    dashedDistLine(tx(g.MX),ty(g.MY), tx(g.quarters[0].x),ty(g.quarters[0].y),
+                   (g.ME*100).toFixed(0)+'cm', GRAY_DASH);
   }
 
   // ── Anchor points H, I ──
@@ -262,6 +318,7 @@ function draw() {
   // ── Quarter points E F G ──
   if(params.showQuarter){
     g.quarters.forEach(q=>drawQuarterPt(tx(q.x),ty(q.y),q.label,dpr));
+    drawMidPt(tx(g.MX),ty(g.MY),'M',dpr);
   }
 
   // ── Key points A B C D ──
@@ -276,8 +333,8 @@ function draw() {
     const fs=FS.dim*dpr;
     ctx.font=`${fs}px 'JetBrains Mono', monospace`;
 
-    function dim(x1,y1,x2,y2,lbl,color,off,horiz){
-      ctx.strokeStyle=color+'88'; ctx.fillStyle=color; ctx.lineWidth=1*dpr;
+    function dim(x1,y1,x2,y2,lbl,_color,off,horiz){
+      ctx.strokeStyle=GRAY_DASH+'88'; ctx.fillStyle=GRAY_DASH; ctx.lineWidth=1*dpr;
       ctx.setLineDash([4*dpr,4*dpr]);
       const nx=horiz?0:1, ny=horiz?1:0;
       [[x1,y1],[x2,y2]].forEach(([x,y])=>{
@@ -296,16 +353,15 @@ function draw() {
       const tw=ctx.measureText(lbl).width+8*dpr;
       ctx.textAlign='center';
       ctx.fillStyle='#0e0f12'; ctx.fillRect(mx2-tw/2,my2-fs*0.75,tw,fs*1.2);
-      ctx.fillStyle=color; ctx.fillText(lbl,mx2,my2+fs*0.35);
+      ctx.fillStyle=GRAY_DASH; ctx.fillText(lbl,mx2,my2+fs*0.35);
     }
 
     const o=32*dpr;
 
     // ── Projection dashed lines ──
     ctx.lineWidth=1*dpr; ctx.setLineDash([3*dpr,4*dpr]);
-    ctx.strokeStyle='#e8c87a44';
+    ctx.strokeStyle=GRAY_DASH+'44';
     ctx.beginPath();ctx.moveTo(tx(g.Aw.x),ty(g.Aw.y));ctx.lineTo(tx(g.Aw.x),ty(0));ctx.stroke();
-    ctx.strokeStyle='#7ab8e844';
     ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(0));ctx.stroke();
     ctx.beginPath();ctx.moveTo(tx(0),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(g.Bw.y));ctx.stroke();
     ctx.setLineDash([]);
@@ -333,11 +389,11 @@ function draw() {
       ty(g.Aw.y)+Math.sin(midA)*(arcR+16*dpr));
 
     // Thickness annotation at B
-    ctx.strokeStyle='#ffffff44'; ctx.lineWidth=1*dpr;
+    ctx.strokeStyle=GRAY_DASH+'44'; ctx.lineWidth=1*dpr;
     ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Bo.x),ty(g.Bo.y));ctx.stroke();
     const tmx=(tx(g.Bw.x)+tx(g.Bo.x))/2, tmy=(ty(g.Bw.y)+ty(g.Bo.y))/2;
     ctx.font=`${(FS.dim-1)*dpr}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle='#ffffff55'; ctx.textAlign='left';
+    ctx.fillStyle=GRAY_DASH+'88'; ctx.textAlign='left';
     ctx.fillText('5cm', tmx+8*dpr, tmy+4*dpr);
   }
 
@@ -383,6 +439,20 @@ function drawDiamond(px,py,color,label,dpr){
   ctx.font=`700 ${FS.label*dpr}px 'JetBrains Mono', monospace`;
   ctx.fillStyle=LABEL_RED; ctx.textAlign='left';
   ctx.fillText(label,px+12*dpr,py+5*dpr);
+}
+
+function drawMidPt(px,py,label,dpr){
+  const r=5*dpr;
+  ctx.strokeStyle='#ffffff99'; ctx.lineWidth=2*dpr;
+  ctx.fillStyle='#ffffff22';
+  ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+  // crosshair
+  ctx.strokeStyle='#ffffff66'; ctx.lineWidth=1*dpr;
+  ctx.beginPath();ctx.moveTo(px-7*dpr,py);ctx.lineTo(px+7*dpr,py);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(px,py-7*dpr);ctx.lineTo(px,py+7*dpr);ctx.stroke();
+  ctx.font=`700 ${FS.label*dpr}px 'JetBrains Mono', monospace`;
+  ctx.fillStyle=LABEL_RED; ctx.textAlign='left';
+  ctx.fillText(label,px+10*dpr,py-6*dpr);
 }
 
 function drawQuarterPt(px,py,label,dpr){
