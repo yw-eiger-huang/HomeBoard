@@ -31,6 +31,10 @@ Single-file HTML5 canvas application (`Code/board_viz.html`) with no frameworks 
 
 **Spec:** `Spec/20260325.md` contains the full technical specification in Traditional Chinese, including formulas for all point coordinates and visual design requirements.
 
+## Terminology
+
+- **內側 (inner side)**: 木板靠牆的那一面 (the face of the board facing the wall)
+
 ## Deployment
 
 Hosted on **GitHub Pages** at:

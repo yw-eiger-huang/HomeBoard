@@ -14,7 +14,7 @@ const AY   = CEIL_H; // 2.5
 const HX = 0, HY = CEIL_H;
 const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
 
-let params = { angle: 40, foldAngle: 0, showDims: true, showFold: true, showArc: true, showQuarter: true };
+let params = { angle: 40, showDims: true, showFold: true, showArc: true, showQuarter: true };
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 // Board direction (wall-side edge, from A downward toward wall):
@@ -60,9 +60,10 @@ function getGeom() {
   // Board direction angle
   const boardDir = Math.atan2(ddy, ddx);
 
-  // Fold: rigid rectangle around B_w
-  const foldRad = params.foldAngle * Math.PI / 180;
-  const foldDir = boardDir + foldRad;
+  // Fold: rigid rectangle around B_w — synced with wall angle, folds toward inner side (wall)
+  // foldRad: 5π/6 (150°) at angle=0 → 0 at angle=40 (straight, D=C)
+  const foldRad = (5 * Math.PI / 6) * (1 - params.angle / 40);
+  const foldDir = boardDir - foldRad;
   const fdx = Math.cos(foldDir), fdy = Math.sin(foldDir);
 
   // Fold outward normal: rotate foldDir by +90° → (-fdy, fdx)
@@ -77,10 +78,10 @@ function getGeom() {
   // B outer for fold = B_w + T*(fnx,fny) — same as Bo when foldAngle=0
   const Bfo = { x: Bw.x + T * fnx, y: Bw.y + T * fny };
 
-  // Quarter points on center line
+  // Quarter points on wall-side edge
   const quarters = [1,2,3].map(i => ({
-    x: Ac.x + (i/4) * MAIN_LEN * ddx,
-    y: Ac.y + (i/4) * MAIN_LEN * ddy,
+    x: Aw.x + (i/4) * MAIN_LEN * ddx,
+    y: Aw.y + (i/4) * MAIN_LEN * ddy,
     label: ['E','F','G'][i-1]
   }));
   const GX = quarters[2].x, GY = quarters[2].y;
@@ -94,31 +95,6 @@ function getGeom() {
 // ── Clamp logic ──────────────────────────────────────────────────────────────
 // angle: 0~40 (no further constraints needed — at 0° board is vertical against wall)
 function clampAngle(a) { return Math.min(Math.max(a, 0), 40); }
-
-// foldAngle: must keep D_w (x≥0, y≥0, y≤CEIL_H) and ≤ 0
-function computeFoldLimits(angle) {
-  const rad = angle * Math.PI / 180;
-  const ddx = -Math.sin(rad), ddy = -Math.cos(rad);
-  const Bwx = AX_W + MAIN_LEN * ddx, Bwy = AY + MAIN_LEN * ddy;
-  const boardDir = Math.atan2(ddy, ddx);
-  const steps = 1800;
-  let vMin = null, vMax = 0;
-  for (let i = 0; i <= steps; i++) {
-    const fa = -90 + i * 90 / steps; // [-90, 0]
-    const fd = boardDir + fa * Math.PI / 180;
-    const DX = Bwx + FOLD_LEN * Math.cos(fd);
-    const DY = Bwy + FOLD_LEN * Math.sin(fd);
-    if (DX >= -0.001 && DY >= -0.001 && DY <= CEIL_H + 0.001) {
-      if (vMin === null) vMin = fa;
-      vMax = fa;
-    }
-  }
-  return { min: vMin ?? 0, max: Math.min(0, vMax) };
-}
-function clampFold(fa, angle) {
-  const l = computeFoldLimits(angle);
-  return Math.min(Math.max(fa, l.min), l.max);
-}
 
 // ── Sliders ──────────────────────────────────────────────────────────────────
 let viewOX = 0, viewOY = 0, viewScale = 1;
@@ -135,31 +111,14 @@ function resize() {
 
 const angleSlider = document.getElementById('angle');
 const angleValEl  = document.getElementById('angleVal');
-const foldSlider  = document.getElementById('foldAngle');
-const foldValEl   = document.getElementById('foldAngleVal');
-
-function updateLimits() {
-  const fl = computeFoldLimits(params.angle);
-  foldSlider.min = fl.min; foldSlider.max = Math.min(0, fl.max);
-}
 
 angleSlider.addEventListener('input', () => {
   params.angle = clampAngle(parseFloat(angleSlider.value));
   angleSlider.value = params.angle;
   angleValEl.textContent = params.angle.toFixed(1) + '°';
-  params.foldAngle = clampFold(params.foldAngle, params.angle);
-  foldSlider.value = params.foldAngle;
-  foldValEl.textContent = params.foldAngle.toFixed(0) + '°';
-  updateLimits(); draw();
-});
-foldSlider.addEventListener('input', () => {
-  params.foldAngle = clampFold(parseFloat(foldSlider.value), params.angle);
-  foldSlider.value = params.foldAngle;
-  foldValEl.textContent = params.foldAngle.toFixed(0) + '°';
   draw();
 });
-angleValEl.textContent = '40°'; foldValEl.textContent = '0°';
-updateLimits();
+angleValEl.textContent = '40°';
 
 ['togDims','togFold','togArc','togQuarter'].forEach((id,i)=>{
   const keys=['showDims','showFold','showArc','showQuarter'];
@@ -182,19 +141,6 @@ canvas.addEventListener('wheel',e=>{
   viewScale=Math.min(Math.max(viewScale,0.15),12);draw();
 },{passive:false});
 
-// ── Stats ────────────────────────────────────────────────────────────────────
-function updateStats(g) {
-  document.getElementById('sBw').textContent = (g.Bw.x*100).toFixed(1)+' cm';
-  document.getElementById('sBg').textContent = (g.Bw.y*100).toFixed(1)+' cm';
-  document.getElementById('sCw').textContent = (g.Cw.x*100).toFixed(1)+' cm';
-  document.getElementById('sCg').textContent = (g.Cw.y*100).toFixed(1)+' cm';
-  const dw = document.getElementById('sDw');
-  dw.textContent = (g.Dw.x*100).toFixed(1)+' cm';
-  dw.className   = 'stat-val '+(g.Dw.x<0.01?'yellow':'green');
-  document.getElementById('sDg').textContent = (g.Dw.y*100).toFixed(1)+' cm';
-  document.getElementById('sHG').textContent = (g.HG*100).toFixed(1)+' cm';
-  document.getElementById('warn-box').innerHTML = '<div class="ok">✓ 構型正常</div>';
-}
 
 // ── Draw ─────────────────────────────────────────────────────────────────────
 function draw() {
@@ -202,7 +148,7 @@ function draw() {
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle='#0e0f12'; ctx.fillRect(0,0,W,H);
 
-  const g = getGeom(); updateStats(g);
+  const g = getGeom();
 
   const margin = 90*dpr;
   const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
@@ -236,14 +182,13 @@ function draw() {
   ctx.beginPath();ctx.moveTo(tx(0),ty(0));ctx.lineTo(tx(0),ty(CEIL_H));ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── Fold arc (wall-side edge of D sweeping) ──
+  // ── Fold arc (D sweeping 0~150° fold range) ──
   if(params.showFold && params.showArc){
     const steps=60;
     ctx.strokeStyle='rgba(122,232,176,0.22)'; ctx.lineWidth=1.5*dpr;
     ctx.setLineDash([3*dpr,4*dpr]);
     for(let i=0;i<=steps;i++){
-      const fa=(-90+i*90/steps)*Math.PI/180;
-      const fd=g.boardDir+fa;
+      const fd=g.boardDir-i*(5*Math.PI/6)/steps;
       const ex=g.Bw.x+FOLD_LEN*Math.cos(fd), ey=g.Bw.y+FOLD_LEN*Math.sin(fd);
       if(i===0){ctx.beginPath();ctx.moveTo(tx(ex),ty(ey));}else ctx.lineTo(tx(ex),ty(ey));
     }
@@ -251,7 +196,7 @@ function draw() {
     ctx.fillStyle='rgba(122,232,176,0.04)';
     ctx.beginPath(); ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));
     for(let i=0;i<=steps;i++){
-      const fa=(-90+i*90/steps)*Math.PI/180, fd=g.boardDir+fa;
+      const fd=g.boardDir-i*(5*Math.PI/6)/steps;
       ctx.lineTo(tx(g.Bw.x+FOLD_LEN*Math.cos(fd)), ty(g.Bw.y+FOLD_LEN*Math.sin(fd)));
     }
     ctx.closePath(); ctx.fill();
@@ -355,6 +300,20 @@ function draw() {
     }
 
     const o=32*dpr;
+
+    // ── Projection dashed lines ──
+    ctx.lineWidth=1*dpr; ctx.setLineDash([3*dpr,4*dpr]);
+    ctx.strokeStyle='#e8c87a44';
+    ctx.beginPath();ctx.moveTo(tx(g.Aw.x),ty(g.Aw.y));ctx.lineTo(tx(g.Aw.x),ty(0));ctx.stroke();
+    ctx.strokeStyle='#7ab8e844';
+    ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(0));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tx(0),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(g.Bw.y));ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ── A→B 段對地面投影 & B 對牆面投影高度 ──
+    dim(tx(g.Bw.x),ty(0), tx(g.Aw.x),ty(0), ((g.Aw.x-g.Bw.x)*100).toFixed(0)+'cm','#c4894a', o, true);
+    dim(tx(0),ty(0), tx(0),ty(g.Bw.y), (g.Bw.y*100).toFixed(0)+'cm','#7ab8e8',-o*2, false);
+
     dim(tx(0),ty(0), tx(0),ty(CEIL_H), CEIL_H.toFixed(2)+'m','#7ab8e8',-o,false);
     dim(tx(0),ty(CEIL_H+0.1), tx(g.Aw.x),ty(CEIL_H+0.1), g.Aw.x.toFixed(3)+'m','#e8c87a',-o,true);
     if(g.Cw.y>0.002)
