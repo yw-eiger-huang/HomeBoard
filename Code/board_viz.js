@@ -22,7 +22,7 @@ const G0_RIG_Y = AY - (3 / 4) * MAIN_LEN;
 const LEN_HM_RIG = Math.hypot((HX + G0_RIG_X) / 2 - HX, (HY + G0_RIG_Y) / 2 - HY);
 const LEN_MG_RIG = LEN_HM_RIG; // M0 is midpoint → equal lengths
 
-let params = { angle: 40, showDims: true, showFold: true, showQuarter: true };
+let params = { angle: 40, inwardOffset: 1.0, showDims: true, showFold: true, showQuarter: true };
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 // Board direction (wall-side edge, from A downward toward wall):
@@ -116,9 +116,16 @@ function getGeom() {
   const MA = Math.hypot(Aw.x - MX, Aw.y - MY);
   const ME = Math.hypot(quarters[0].x - MX, quarters[0].y - MY);
 
+  // ── 地面外側端往內縮 1M 之投影 ──
+  // 外側端 = 主板外側頂角 Ao；地面投影 = (Ao.x, 0)；往內縮 1M = (Ao.x − 1.0, 0)
+  const refFloorX = Ao.x - params.inwardOffset;
+  const t_proj = (Ao.x - Bo.x) > 0.001 ? (refFloorX - Bo.x) / (Ao.x - Bo.x) : -1;
+  const projOnBoardY = (t_proj >= 0 && t_proj <= 1) ? Bo.y + t_proj * (Ao.y - Bo.y) : null;
+
   return { Aw,Ao,Ac, Bw,Bo,Bc,Bfo, Cw,Co, Dw,Do,
            boardDir, foldDir, fdx,fdy, fnx,fny,
-           quarters, GX,GY, HG, MX,MY,MA,ME };
+           quarters, GX,GY, HG, MX,MY,MA,ME,
+           refFloorX, projOnBoardY };
 }
 
 // ── Clamp logic ──────────────────────────────────────────────────────────────
@@ -148,6 +155,14 @@ angleSlider.addEventListener('input', () => {
   draw();
 });
 angleValEl.textContent = '40°';
+
+const inwardSlider = document.getElementById('inward');
+const inwardValEl  = document.getElementById('inwardVal');
+inwardSlider.addEventListener('input', () => {
+  params.inwardOffset = parseFloat(inwardSlider.value) / 100;
+  inwardValEl.textContent = inwardSlider.value + 'cm';
+  draw();
+});
 
 ['togDims','togFold','togQuarter'].forEach((id,i)=>{
   const keys=['showDims','showFold','showQuarter'];
@@ -389,6 +404,34 @@ function draw() {
     dim(tx(0),ty(CEIL_H+0.1), tx(g.Aw.x),ty(CEIL_H+0.1), g.Aw.x.toFixed(3)+'m','#e8c87a',-o,true);
     if(g.Cw.y>0.002)
       dim(tx(g.Cw.x-0.1),ty(0), tx(g.Cw.x-0.1),ty(g.Cw.y), (g.Cw.y*100).toFixed(0)+'cm','#e87a7a',-o*0.75,false);
+
+    // ── 地面外側端往內縮 → 主板外側面投影高度 ──
+    if (g.projOnBoardY !== null) {
+      const rx = g.refFloorX, py = g.projOnBoardY;
+      ctx.font = `${fs}px 'JetBrains Mono', monospace`;
+
+      // 地面內縮距離標示（水平 dim 線，位於地面下方）
+      dim(tx(rx), ty(0), tx(g.Ao.x), ty(0),
+          (params.inwardOffset * 100).toFixed(0) + 'cm', GRAY_DASH, 26*dpr, true);
+
+      // 垂直虛線：地面參考點 → 主板外側面交點
+      ctx.strokeStyle = GRAY_DASH + '88'; ctx.lineWidth = 1.2*dpr;
+      ctx.setLineDash([4*dpr, 4*dpr]);
+      ctx.beginPath(); ctx.moveTo(tx(rx), ty(0)); ctx.lineTo(tx(rx), ty(py)); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 交點標記
+      ctx.fillStyle = GRAY_DASH;
+      ctx.beginPath(); ctx.arc(tx(rx), ty(py), 4*dpr, 0, Math.PI*2); ctx.fill();
+
+      // 高度標籤（置中於垂直線，顯示在線右側）
+      const heightLbl = (py * 100).toFixed(0) + 'cm';
+      const vlMidY = (ty(0) + ty(py)) / 2;
+      const tw2 = ctx.measureText(heightLbl).width + 8*dpr;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#0e0f12'; ctx.fillRect(tx(rx) + 4*dpr, vlMidY - fs*0.85, tw2, fs*1.3);
+      ctx.fillStyle = GRAY_DASH; ctx.fillText(heightLbl, tx(rx) + 8*dpr, vlMidY + fs*0.35);
+    }
 
     // Angle arc at A
     const arcR=44*dpr, wallDown=-Math.PI/2, bDir=g.boardDir;
