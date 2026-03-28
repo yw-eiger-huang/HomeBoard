@@ -69,8 +69,8 @@ function getGeom() {
   const boardDir = Math.atan2(ddy, ddx);
 
   // Fold: rigid rectangle around B_w — synced with wall angle, folds toward inner side (wall)
-  // foldRad: 5π/6 (150°) at angle=0 → 0 at angle=40 (straight, D=C)
-  const foldRad = (5 * Math.PI / 6) * (1 - params.angle / 40);
+  // foldRad: 2π/3 (120°) at angle=0 → 0 at angle=40 (straight, D=C)
+  const foldRad = (2 * Math.PI / 3) * (1 - params.angle / 40);
   const foldDir = boardDir - foldRad;
   const fdx = Math.cos(foldDir), fdy = Math.sin(foldDir);
 
@@ -365,6 +365,21 @@ function draw() {
     ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(0));ctx.stroke();
     ctx.beginPath();ctx.moveTo(tx(0),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(g.Bw.y));ctx.stroke();
     ctx.setLineDash([]);
+
+    // ── H→B dashed distance ──
+    {
+      const HB = Math.hypot(g.Bw.x - HX, g.Bw.y - HY);
+      ctx.strokeStyle = GRAY_DASH + '88'; ctx.lineWidth = 1.2*dpr;
+      ctx.setLineDash([5*dpr, 4*dpr]);
+      ctx.beginPath(); ctx.moveTo(tx(HX), ty(HY)); ctx.lineTo(tx(g.Bw.x), ty(g.Bw.y)); ctx.stroke();
+      ctx.setLineDash([]);
+      const hb_mx = (tx(HX)+tx(g.Bw.x))/2, hb_my = (ty(HY)+ty(g.Bw.y))/2;
+      const hbLbl = (HB*100).toFixed(0)+'cm';
+      const hb_tw = ctx.measureText(hbLbl).width + 8*dpr;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#0e0f12'; ctx.fillRect(hb_mx - hb_tw/2, hb_my - fs*0.85, hb_tw, fs*1.3);
+      ctx.fillStyle = GRAY_DASH; ctx.fillText(hbLbl, hb_mx, hb_my + fs*0.35);
+    }
 
     // ── A→B 段對地面投影 & B 對牆面投影高度 ──
     dim(tx(g.Bw.x),ty(0), tx(g.Aw.x),ty(0), ((g.Aw.x-g.Bw.x)*100).toFixed(0)+'cm','#c4894a', o, true);
