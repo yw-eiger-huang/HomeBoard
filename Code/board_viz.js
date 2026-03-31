@@ -225,7 +225,7 @@ function draw() {
 
   const g = getGeom();
 
-  const margin = 90*dpr;
+  const margin = Math.min(90*dpr, Math.min(W,H) * 0.025);
   const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
   const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
