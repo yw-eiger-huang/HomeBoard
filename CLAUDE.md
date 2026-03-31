@@ -48,8 +48,7 @@ Hosted on **GitHub Pages** at:
 ## Working Rules
 
 - **Do not commit or push** unless explicitly asked by the user.
+- **When modifying `CLAUDE.md`**, review each change and consider whether it would be better enforced as a hook in `.claude/settings.json` rather than as a behavioral instruction.
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
-- **Do not show screenshots** in responses. Do not call `preview_screenshot`.
 - **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes. Also ask whether to create a new dated file or update the existing one.
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
-- **Sync `index.html`**: Whenever `Code/board_viz.html` is modified, immediately sync the root `index.html` to match — keeping the HTML body identical but with asset paths updated to `Code/board_viz.css` and `Code/board_viz.js`. Do this as part of the same edit session, before committing.
