@@ -52,3 +52,4 @@ Hosted on **GitHub Pages** at:
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
 - **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes. Also ask whether to create a new dated file or update the existing one.
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
+- **When creating a new spec file**, write the content in a polished and compacted style: use `|·|` notation for distances, merge subsections that share the same structure, avoid repeating formulas already stated elsewhere (cross-reference instead), and remove verbose CSS/implementation detail in favor of concise prose or tables.
