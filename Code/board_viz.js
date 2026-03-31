@@ -185,6 +185,37 @@ canvas.addEventListener('wheel',e=>{
   viewScale=Math.min(Math.max(viewScale,0.15),12);draw();
 },{passive:false});
 
+// ── Touch (pan + pinch-zoom) ─────────────────────────────────────────────────
+let lastTouchDist = null;
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    dragging=true; lastMX=e.touches[0].clientX; lastMY=e.touches[0].clientY;
+  } else if(e.touches.length===2){
+    dragging=false;
+    lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
+                             e.touches[0].clientY-e.touches[1].clientY);
+  }
+},{passive:false});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1&&dragging){
+    viewOX+=(e.touches[0].clientX-lastMX)*devicePixelRatio;
+    viewOY+=(e.touches[0].clientY-lastMY)*devicePixelRatio;
+    lastMX=e.touches[0].clientX; lastMY=e.touches[0].clientY; draw();
+  } else if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
+                       e.touches[0].clientY-e.touches[1].clientY);
+    if(lastTouchDist){viewScale*=d/lastTouchDist;viewScale=Math.min(Math.max(viewScale,0.15),12);draw();}
+    lastTouchDist=d;
+  }
+},{passive:false});
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault();
+  if(e.touches.length===0){dragging=false;lastTouchDist=null;}
+  else if(e.touches.length===1){lastTouchDist=null;lastMX=e.touches[0].clientX;lastMY=e.touches[0].clientY;}
+},{passive:false});
+
 
 // ── Draw ─────────────────────────────────────────────────────────────────────
 function draw() {
@@ -199,7 +230,7 @@ function draw() {
   const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
   const OX = margin + viewOX + 44*dpr;
-  const OY = H - margin - 44*dpr + viewOY;
+  const OY = margin + CEIL_H*S + viewOY;
   const tx = x => OX + x*S;
   const ty = y => OY - y*S;
 
