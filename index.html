@@ -14,7 +14,7 @@
 <div class="main">
   <div class="canvas-wrap">
     <canvas id="c"></canvas>
-    <div class="hint">拖曳平移 · 滾輪縮放</div>
+    <div class="hint">拖曳平移 · 滾輪縮放 · 雙指縮放</div>
   </div>
   <div class="panel">
     <div class="panel-section">
@@ -25,16 +25,16 @@
         <span class="param-val" id="angleVal">40°</span>
       </div>
       <div class="param-row">
-        <label>摺疊角度</label>
-        <input type="range" id="foldAngle" min="-90" max="0" step="1" value="0">
-        <span class="param-val" id="foldAngleVal">0°</span>
+        <label>內縮距離</label>
+        <input type="range" id="inward" min="100" max="150" step="5" value="100">
+        <span class="param-val" id="inwardVal">100cm</span>
       </div>
+
     </div>
     <div class="panel-section">
       <h2>顯示</h2>
       <div class="toggle-row"><label>標註尺寸</label><div class="toggle on" id="togDims"></div></div>
       <div class="toggle-row"><label>摺疊段</label><div class="toggle on" id="togFold"></div></div>
-      <div class="toggle-row"><label>摺疊弧</label><div class="toggle on" id="togArc"></div></div>
       <div class="toggle-row"><label>四等分點 E F G</label><div class="toggle on" id="togQuarter"></div></div>
     </div>
     <div class="panel-section">
@@ -44,29 +44,6 @@
       <div class="stat-row"><span class="stat-label">板厚</span><span class="stat-val yellow">5 cm</span></div>
       <div class="stat-row"><span class="stat-label">天花板高</span><span class="stat-val yellow">2.500 m</span></div>
       <div class="stat-row"><span class="stat-label">A 離牆（靠牆側）</span><span class="stat-val blue">1.959 m</span></div>
-    </div>
-    <div class="panel-section">
-      <h2>計算結果</h2>
-      <div class="stat-row"><span class="stat-label">B 離牆</span><span class="stat-val blue" id="sBw">—</span></div>
-      <div class="stat-row"><span class="stat-label">B 離地</span><span class="stat-val yellow" id="sBg">—</span></div>
-      <div class="stat-row"><span class="stat-label">C 離牆</span><span class="stat-val blue" id="sCw">—</span></div>
-      <div class="stat-row"><span class="stat-label">C 離地</span><span class="stat-val green" id="sCg">—</span></div>
-      <div class="stat-row"><span class="stat-label">D 離牆</span><span class="stat-val" id="sDw">—</span></div>
-      <div class="stat-row"><span class="stat-label">D 離地</span><span class="stat-val yellow" id="sDg">—</span></div>
-      <div class="stat-row"><span class="stat-label">H→G 距離</span><span class="stat-val blue" id="sHG">—</span></div>
-      <div id="warn-box"><div class="ok">✓ 構型正常</div></div>
-    </div>
-    <div class="panel-section">
-      <h2>圖例</h2>
-      <div class="legend">
-        <div class="legend-item"><div class="legend-dot" style="background:#e8c87a"></div>A — Hinge（固定）</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#7ab8e8"></div>B — 折點（靠牆側邊緣）</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#e87a7a"></div>C — 主板底端（靠牆側）</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#b07ae8"></div>D — 摺疊端（靠牆側）</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#c4894a"></div>E F G — AB 四等分（中心線）</div>
-        <div class="legend-item"><div class="legend-dia" style="background:#7ae8b0"></div>&nbsp;H — 牆角</div>
-        <div class="legend-item"><div class="legend-dia" style="background:#e8a87a"></div>&nbsp;I — 全長觸牆點 (40°)</div>
-      </div>
     </div>
   </div>
 </div>
