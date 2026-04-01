@@ -15,14 +15,8 @@ const AY   = CEIL_H; // 2.5
 const HX = 0, HY = CEIL_H;
 const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
 
-// Rigid bar lengths from H→M and M→G, computed at angle=0
-// At angle=0: ddx=0, ddy=-1 → G0 = (AX_W, AY - (3/4)*MAIN_LEN)
-const G0_RIG_X = AX_W;
-const G0_RIG_Y = AY - (3 / 4) * MAIN_LEN;
-const LEN_HM_RIG = Math.hypot((HX + G0_RIG_X) / 2 - HX, (HY + G0_RIG_Y) / 2 - HY);
-const LEN_MG_RIG = LEN_HM_RIG; // M0 is midpoint → equal lengths
-
-let params = { angle: 40, inwardOffset: 1.0, showDims: true, showFold: true, showQuarter: true };
+let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, showDims: true, showFold: true, showQuarter: true };
+// gOffset range: 1.75 ~ 2.15 m
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
 // Board direction (wall-side edge, from A downward toward wall):
@@ -86,24 +80,24 @@ function getGeom() {
   // B outer for fold = B_w + T*(fnx,fny) — same as Bo when foldAngle=0
   const Bfo = { x: Bw.x + T * fnx, y: Bw.y + T * fny };
 
-  // Quarter points on wall-side edge
-  const quarters = [1,2,3].map(i => ({
-    x: Aw.x + (i/4) * MAIN_LEN * ddx,
-    y: Aw.y + (i/4) * MAIN_LEN * ddy,
-    label: ['E','F','G'][i-1]
-  }));
-  const GX = quarters[2].x, GY = quarters[2].y;
+  // G point: user-controlled distance from A along board wall-side edge
+  const GX = Aw.x + params.gOffset * ddx;
+  const GY = Aw.y + params.gOffset * ddy;
   const HG = Math.hypot(HX - GX, HY - GY);
 
-  // Rigid junction M: two bars (H→M, M→G) with fixed lengths from angle=0
+  // Rigid bar lengths (H-M = M-G), computed from G position at angle=0:
+  // At θ=0: G0=(AX_W, AY-gOffset), M0=midpoint(H,G0) → LEN_HM = 0.5*hypot(AX_W, gOffset)
+  const LEN_HM = 0.5 * Math.hypot(AX_W, params.gOffset);
+
+  // Rigid junction M: two equal bars (H→M, M→G)
   // Solved via two-circle intersection; bends toward A when angle > 0
   let MX, MY;
   const dHG = Math.hypot(GX - HX, GY - HY);
   if (dHG < 0.0001) {
     MX = HX; MY = HY;
   } else {
-    const a_rig = (LEN_HM_RIG * LEN_HM_RIG - LEN_MG_RIG * LEN_MG_RIG + dHG * dHG) / (2 * dHG);
-    const h_rig = Math.sqrt(Math.max(0, LEN_HM_RIG * LEN_HM_RIG - a_rig * a_rig));
+    const a_rig = dHG / 2; // equal lengths → midpoint on H-G line
+    const h_rig = Math.sqrt(Math.max(0, LEN_HM * LEN_HM - a_rig * a_rig));
     const pmx = HX + a_rig * (GX - HX) / dHG;
     const pmy = HY + a_rig * (GY - HY) / dHG;
     const perpX = -(GY - HY) / dHG;
@@ -114,7 +108,6 @@ function getGeom() {
     MY = crossA >= 0 ? pmy + h_rig * perpY : pmy - h_rig * perpY;
   }
   const MA = Math.hypot(Aw.x - MX, Aw.y - MY);
-  const ME = Math.hypot(quarters[0].x - MX, quarters[0].y - MY);
 
   // ── 地面外側端往內縮 1M 之投影 ──
   // 外側端 = 主板外側頂角 Ao；地面投影 = (Ao.x, 0)；往內縮 1M = (Ao.x − 1.0, 0)
@@ -124,7 +117,7 @@ function getGeom() {
 
   return { Aw,Ao,Ac, Bw,Bo,Bc,Bfo, Cw,Co, Dw,Do,
            boardDir, foldDir, fdx,fdy, fnx,fny,
-           quarters, GX,GY, HG, MX,MY,MA,ME,
+           GX,GY, HG, LEN_HM, MX,MY,MA,
            refFloorX, projOnBoardY };
 }
 
@@ -161,6 +154,14 @@ const inwardValEl  = document.getElementById('inwardVal');
 inwardSlider.addEventListener('input', () => {
   params.inwardOffset = parseFloat(inwardSlider.value) / 100;
   inwardValEl.textContent = inwardSlider.value + 'cm';
+  draw();
+});
+
+const gOffsetSlider = document.getElementById('gOffset');
+const gOffsetValEl  = document.getElementById('gOffsetVal');
+gOffsetSlider.addEventListener('input', () => {
+  params.gOffset = parseFloat(gOffsetSlider.value) / 100;
+  gOffsetValEl.textContent = gOffsetSlider.value + 'cm';
   draw();
 });
 
@@ -315,7 +316,7 @@ function draw() {
       const lfs = FS.dim * dpr;
       ctx.font = `${lfs}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
-      const rigLbl = (LEN_HM_RIG * 100).toFixed(0) + 'cm';
+      const rigLbl = (g.LEN_HM * 100).toFixed(0) + 'cm';
       // H-M midpoint
       const hm_mx = tx((HX + g.MX) / 2), hm_my = ty((HY + g.MY) / 2);
       const tw_hm = ctx.measureText(rigLbl).width + 8 * dpr;
@@ -353,17 +354,21 @@ function draw() {
     ctx.font=`${fs}px 'JetBrains Mono', monospace`;
     dashedDistLine(tx(g.MX),ty(g.MY), tx(g.Aw.x),ty(g.Aw.y),
                    (g.MA*100).toFixed(0)+'cm', GRAY_DASH);
-    dashedDistLine(tx(g.MX),ty(g.MY), tx(g.quarters[0].x),ty(g.quarters[0].y),
-                   (g.ME*100).toFixed(0)+'cm', GRAY_DASH);
   }
 
   // ── Anchor points H, I ──
   drawDiamond(tx(HX),ty(HY),'#7ae8b0','H',dpr);
   drawDiamond(tx(REF_IX),ty(REF_IY),'#e8a87a','I',dpr);
 
-  // ── Quarter points E F G ──
+  // ── G point and M ──
   if(params.showQuarter){
-    g.quarters.forEach(q=>drawQuarterPt(tx(q.x),ty(q.y),q.label,dpr));
+    drawQuarterPt(tx(g.GX),ty(g.GY),'G',dpr);
+    // A→G distance label near G
+    const agLbl = (params.gOffset * 100).toFixed(0) + 'cm';
+    ctx.font = `${FS.dim*dpr}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = '#c4894acc';
+    ctx.textAlign = 'left';
+    ctx.fillText('AG:' + agLbl, tx(g.GX) + 12*dpr, ty(g.GY) + 18*dpr);
     drawMidPt(tx(g.MX),ty(g.MY),'M',dpr);
   }
 
