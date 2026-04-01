@@ -22,6 +22,16 @@
             "statusMessage": "Blocking screenshot..."
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python 'D:/CodeSpace/HomeBoard/.claude/guard_claude_md.py'",
+            "statusMessage": "Checking CLAUDE.md branch guard..."
+          }
+        ]
       }
     ]
   }

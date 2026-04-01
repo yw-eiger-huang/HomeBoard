@@ -49,8 +49,9 @@ Hosted on **GitHub Pages** at:
 ## Working Rules
 
 - **Do not commit or push** unless explicitly asked by the user.
-- **Do not create or switch branches** when there are untracked files or unstaged changes.
+- **Do not create or switch branches** when there are untracked files or modified-but-not-staged files.
 - **When modifying `CLAUDE.md`**, review each change and consider whether it would be better enforced as a hook in `.claude/settings.json` rather than as a behavioral instruction.
+- **Always end every response** with: `Request complete. Waiting for next instruction.`
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
 - **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes. Also ask whether to create a new dated file or update the existing one.
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
