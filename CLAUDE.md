@@ -44,10 +44,12 @@ Hosted on **GitHub Pages** at:
 - Branch: `main`, served from repo root (`/`)
 - `index.html` at the root mirrors `Code/board_viz.html` with CSS/JS paths updated to `Code/board_viz.css` and `Code/board_viz.js`
 - To deploy changes: commit and push to `main` — GitHub Pages updates automatically within ~1 minute
+- **Deployment is only allowed from the `main` branch.** Never push to or deploy from any other branch.
 
 ## Working Rules
 
 - **Do not commit or push** unless explicitly asked by the user.
+- **Do not create or switch branches** when there are untracked files or unstaged changes.
 - **When modifying `CLAUDE.md`**, review each change and consider whether it would be better enforced as a hook in `.claude/settings.json` rather than as a behavioral instruction.
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
 - **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes. Also ask whether to create a new dated file or update the existing one.
