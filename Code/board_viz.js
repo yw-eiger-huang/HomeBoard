@@ -3,6 +3,7 @@ const ctx = canvas.getContext('2d');
 
 const BOARD_LEN = 3.048, FOLD_LEN = 0.65, MAIN_LEN = BOARD_LEN - FOLD_LEN;
 const CEIL_H = 2.5, T = 0.05, HT = T / 2;
+const BOARD_W = 3.66; // 板寬（Z 軸深度，公尺）
 const LABEL_RED = '#ff4d4d';
 const GRAY_DASH = '#8888a0';
 const FS = { label: 15, dim: 13, room: 12, seg: 12 };
@@ -15,7 +16,7 @@ const AY   = CEIL_H; // 2.5
 const HX = 0, HY = CEIL_H;
 const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
 
-let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, showDims: true, showFold: true, showQuarter: true };
+let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, hViewAngle: 0, showDims: true, showFold: true, showQuarter: true };
 // gOffset range: 1.75 ~ 2.15 m
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
@@ -165,6 +166,14 @@ gOffsetSlider.addEventListener('input', () => {
   draw();
 });
 
+const hViewSlider = document.getElementById('hViewAngle');
+const hViewValEl  = document.getElementById('hViewAngleVal');
+hViewSlider.addEventListener('input', () => {
+  params.hViewAngle = parseFloat(hViewSlider.value);
+  hViewValEl.textContent = params.hViewAngle.toFixed(0) + '°';
+  draw();
+});
+
 ['togDims','togFold','togQuarter'].forEach((id,i)=>{
   const keys=['showDims','showFold','showQuarter'];
   document.getElementById(id).addEventListener('click',function(){
@@ -227,103 +236,248 @@ function draw() {
   const g = getGeom();
 
   const margin = Math.min(90*dpr, Math.min(W,H) * 0.025);
-  const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
+  const OBL_COS = Math.cos(Math.PI / 6) * 0.5;
+  const OBL_SIN = Math.sin(Math.PI / 6) * 0.5;
+  const cosV = Math.cos(params.hViewAngle * Math.PI / 180);
+  const sinV = Math.sin(params.hViewAngle * Math.PI / 180);
+  const corners = [[0,0],[AX_W+T+0.5,0],[0,BOARD_W],[AX_W+T+0.5,BOARD_W]];
+  let minH=Infinity, maxH=-Infinity;
+  corners.forEach(([x,z])=>{
+    const h = x*cosV + z*sinV, d = -x*sinV + z*cosV;
+    const hc = h + d*OBL_COS;
+    minH=Math.min(minH,hc); maxH=Math.max(maxH,hc);
+  });
+  const sceneW = maxH - minH + 0.2, sceneH = CEIL_H * 1.22;
   const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
-  const OX = margin + viewOX + 44*dpr;
+  const OX = margin + viewOX + 44*dpr - minH*S;
   const OY = margin + CEIL_H*S + viewOY;
-  const tx = x => OX + x*S;
-  const ty = y => OY - y*S;
+  const BW = BOARD_W;
+  const p = (x, y, z=0) => {
+    const h = x*cosV + z*sinV, d = -x*sinV + z*cosV;
+    return [OX + h*S + d*S*OBL_COS, OY - y*S - d*S*OBL_SIN];
+  };
+  const tx = x => p(x,0,0)[0];
 
-  // Room
-  const wt=20*dpr, ct=20*dpr;
-  ctx.fillStyle='#2d3548';
-  ctx.fillRect(tx(0)-wt, ty(CEIL_H)-ct, wt, CEIL_H*S+ct);
-  ctx.fillStyle='#252938';
-  ctx.fillRect(tx(0)-wt, ty(CEIL_H)-ct, (AX_W+0.6)*S+wt, ct);
-  ctx.strokeStyle='#3a4060'; ctx.lineWidth=0.8*dpr;
-  for(let i=0;i<14;i++){
-    const o=i*13*dpr;
-    ctx.beginPath();ctx.moveTo(tx(0)-wt,ty(0)-o);ctx.lineTo(tx(0)-wt-9*dpr,ty(0)-o-9*dpr);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(tx(0)+o,ty(CEIL_H)-ct);ctx.lineTo(tx(0)+o+9*dpr,ty(CEIL_H)-ct-9*dpr);ctx.stroke();
-  }
-  // Floor
-  ctx.strokeStyle='#2a2d38'; ctx.lineWidth=1.5*dpr;
-  ctx.setLineDash([7*dpr,7*dpr]);
-  ctx.beginPath();ctx.moveTo(tx(-0.15),ty(0));ctx.lineTo(tx(AX_W+0.5),ty(0));ctx.stroke();
-  ctx.setLineDash([]);
-  // Wall ref
-  ctx.strokeStyle='#3a406055'; ctx.lineWidth=1*dpr;
-  ctx.setLineDash([4*dpr,4*dpr]);
-  ctx.beginPath();ctx.moveTo(tx(0),ty(0));ctx.lineTo(tx(0),ty(CEIL_H));ctx.stroke();
-  ctx.setLineDash([]);
+  // ── 3D Room surfaces ──
+  const roomMaxX = AX_W + 0.6;
+  const floorMaxX = AX_W + 0.5;
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt'; ctx.setLineDash([]);
 
-// ── Main board polygon: Aw→Bw→Bo→Ao ──
-  ctx.lineJoin='round'; ctx.lineCap='round';
+  // Wall face (x=0 plane, z=0→BW, y=0→CEIL_H)
+  ctx.fillStyle = '#2d3548';
   ctx.beginPath();
-  ctx.moveTo(tx(g.Aw.x),ty(g.Aw.y));
-  ctx.lineTo(tx(g.Bw.x),ty(g.Bw.y));
-  ctx.lineTo(tx(g.Bo.x),ty(g.Bo.y));
-  ctx.lineTo(tx(g.Ao.x),ty(g.Ao.y));
+  ctx.moveTo(...p(0,0,0));
+  ctx.lineTo(...p(0,0,BW));
+  ctx.lineTo(...p(0,CEIL_H,BW));
+  ctx.lineTo(...p(0,CEIL_H,0));
+  ctx.closePath(); ctx.fill();
+
+  // Wall grid lines
+  ctx.strokeStyle = '#3a4060'; ctx.lineWidth = 0.6*dpr;
+  for (let iy = 1; iy < 5; iy++) {
+    const wy = iy * CEIL_H / 5;
+    ctx.beginPath();
+    ctx.moveTo(...p(0,wy,0));
+    ctx.lineTo(...p(0,wy,BW));
+    ctx.stroke();
+  }
+  // Wall front & back edges
+  ctx.strokeStyle = '#4a5070'; ctx.lineWidth = 1.2*dpr;
+  ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
+  ctx.strokeStyle = '#3a4060'; ctx.lineWidth = 0.8*dpr;
+  ctx.beginPath(); ctx.moveTo(...p(0,0,BW)); ctx.lineTo(...p(0,CEIL_H,BW)); ctx.stroke();
+
+  // Ceiling face (y=CEIL_H plane, x=0→roomMaxX, z=0→BW)
+  ctx.fillStyle = '#22263380';
+  ctx.beginPath();
+  ctx.moveTo(...p(0,CEIL_H,0));
+  ctx.lineTo(...p(roomMaxX,CEIL_H,0));
+  ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
+  ctx.lineTo(...p(0,CEIL_H,BW));
+  ctx.closePath(); ctx.fill();
+
+  // Ceiling grid lines (x direction)
+  ctx.strokeStyle = '#3a406088'; ctx.lineWidth = 0.6*dpr;
+  const ceilXStep = roomMaxX / 4;
+  for (let ix = 0; ix <= 4; ix++) {
+    const cx = ix * ceilXStep;
+    ctx.beginPath();
+    ctx.moveTo(...p(cx,CEIL_H,0));
+    ctx.lineTo(...p(cx,CEIL_H,BW));
+    ctx.stroke();
+  }
+  // Ceiling grid lines (z direction)
+  const ceilZStep = BW / 4;
+  for (let iz = 0; iz <= 4; iz++) {
+    const cz = iz * ceilZStep;
+    ctx.beginPath();
+    ctx.moveTo(...p(0,CEIL_H,cz));
+    ctx.lineTo(...p(roomMaxX,CEIL_H,cz));
+    ctx.stroke();
+  }
+  // Ceiling border edges
+  ctx.strokeStyle = '#3a4070'; ctx.lineWidth = 1*dpr;
+  ctx.beginPath();
+  ctx.moveTo(...p(0,CEIL_H,0));
+  ctx.lineTo(...p(roomMaxX,CEIL_H,0));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(...p(0,CEIL_H,BW));
+  ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(...p(0,CEIL_H,0));
+  ctx.lineTo(...p(0,CEIL_H,BW));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(...p(roomMaxX,CEIL_H,0));
+  ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
+  ctx.stroke();
+
+  // Floor edges (front line + depth line)
+  ctx.strokeStyle = '#2a2d38'; ctx.lineWidth = 1.5*dpr;
+  ctx.setLineDash([7*dpr,7*dpr]);
+  ctx.beginPath();
+  ctx.moveTo(...p(-0.15,0,0));
+  ctx.lineTo(...p(floorMaxX,0,0));
+  ctx.stroke();
+  ctx.strokeStyle = '#2a2d3866'; ctx.lineWidth = 1*dpr;
+  ctx.beginPath();
+  ctx.moveTo(...p(0,0,0));
+  ctx.lineTo(...p(0,0,BW));
+  ctx.lineTo(...p(floorMaxX,0,BW));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Wall-floor & wall-ceiling corner edges (front)
+  ctx.strokeStyle = '#3a406055'; ctx.lineWidth = 1*dpr;
+  ctx.setLineDash([4*dpr,4*dpr]);
+  ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── 3D Boards (Painter's algorithm: back → sides → caps → front) ──
+  ctx.lineJoin='round'; ctx.lineCap='round';
+
+  // Helper: shorthand for board corner points at a given z
+  const mb = (pt, z) => ({ x: pt.x, y: pt.y, z });
+  const lw3 = 1.2 * dpr;
+
+  // ── Main board 3D prism ──
+  // 1. Back face (z=BW)
+  drawFace3D([mb(g.Aw,BW),mb(g.Bw,BW),mb(g.Bo,BW),mb(g.Ao,BW)],
+    p,'rgba(140,90,40,0.20)','#9a6030',lw3);
+  // 2. Outer/top connecting face (Ao→Bo front → Bo→Ao back)
+  drawFace3D([mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)],
+    p,'rgba(168,110,55,0.35)','#b07040',lw3);
+  // 3. End cap at A (top, 5cm thick)
+  drawFace3D([mb(g.Aw,0),mb(g.Ao,0),mb(g.Ao,BW),mb(g.Aw,BW)],
+    p,'rgba(120,78,35,0.45)','#8a5828',lw3);
+  // 4. End cap at B (bottom, 5cm thick)
+  drawFace3D([mb(g.Bw,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Bw,BW)],
+    p,'rgba(120,78,35,0.45)','#8a5828',lw3);
+  // 5. Front face (z=0)
+  ctx.beginPath();
+  ctx.moveTo(...p(g.Aw.x,g.Aw.y));
+  ctx.lineTo(...p(g.Bw.x,g.Bw.y));
+  ctx.lineTo(...p(g.Bo.x,g.Bo.y));
+  ctx.lineTo(...p(g.Ao.x,g.Ao.y));
   ctx.closePath();
   ctx.fillStyle='rgba(196,137,74,0.28)'; ctx.fill();
   ctx.strokeStyle='#c4894a'; ctx.lineWidth=1.5*dpr; ctx.stroke();
 
-  // Ghost C extension (dashed)
+  // Ghost C extension (dashed, front face only)
   ctx.setLineDash([5*dpr,5*dpr]); ctx.lineWidth=1*dpr;
   ctx.strokeStyle='rgba(136,136,160,0.35)';
-  ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Cw.x),ty(g.Cw.y));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Cw.x,g.Cw.y));ctx.stroke();
   ctx.strokeStyle='rgba(136,136,160,0.2)';
-  ctx.beginPath();ctx.moveTo(tx(g.Bo.x),ty(g.Bo.y));ctx.lineTo(tx(g.Co.x),ty(g.Co.y));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(...p(g.Bo.x,g.Bo.y));ctx.lineTo(...p(g.Co.x,g.Co.y));ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── Fold section: rigid rectangle Bw→Dw→Do→Bfo ──
+  // ── Fold section 3D prism ──
   if(params.showFold){
+    // 6. Back face
+    drawFace3D([mb(g.Bw,BW),mb(g.Dw,BW),mb(g.Do,BW),mb(g.Bfo,BW)],
+      p,'rgba(60,100,140,0.18)','#3a6488',lw3);
+    // 7. Outer connecting face (Bfo→Do front → back)
+    drawFace3D([mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)],
+      p,'rgba(80,130,175,0.30)','#508aaf',lw3);
+    // 8. End cap at B (fold top, 5cm thick)
+    drawFace3D([mb(g.Bw,0),mb(g.Bfo,0),mb(g.Bfo,BW),mb(g.Bw,BW)],
+      p,'rgba(50,90,130,0.40)','#325a82',lw3);
+    // 9. End cap at D (fold bottom, 5cm thick)
+    drawFace3D([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
+      p,'rgba(50,90,130,0.40)','#325a82',lw3);
+    // 10. Front face (z=0)
     ctx.beginPath();
-    ctx.moveTo(tx(g.Bw.x), ty(g.Bw.y));
-    ctx.lineTo(tx(g.Dw.x), ty(g.Dw.y));
-    ctx.lineTo(tx(g.Do.x), ty(g.Do.y));
-    ctx.lineTo(tx(g.Bfo.x),ty(g.Bfo.y));
+    ctx.moveTo(...p(g.Bw.x, g.Bw.y));
+    ctx.lineTo(...p(g.Dw.x, g.Dw.y));
+    ctx.lineTo(...p(g.Do.x, g.Do.y));
+    ctx.lineTo(...p(g.Bfo.x,g.Bfo.y));
     ctx.closePath();
     ctx.fillStyle='rgba(122,184,232,0.22)'; ctx.fill();
     ctx.strokeStyle='#7ab8e8'; ctx.lineWidth=1.5*dpr; ctx.stroke();
   }
 
-  // Center line (dashed, main board only)
+  // Center line (dashed, main board front face only)
   ctx.strokeStyle='rgba(136,136,160,0.22)'; ctx.lineWidth=1*dpr;
   ctx.setLineDash([4*dpr,4*dpr]);
-  ctx.beginPath();ctx.moveTo(tx(g.Ac.x),ty(g.Ac.y));ctx.lineTo(tx(g.Bc.x),ty(g.Bc.y));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(...p(g.Ac.x,g.Ac.y));ctx.lineTo(...p(g.Bc.x,g.Bc.y));ctx.stroke();
   ctx.setLineDash([]);
 
   // ── H→G dashed distance ──
   if(params.showQuarter){
     ctx.strokeStyle=GRAY_DASH+'66'; ctx.lineWidth=1.5*dpr;
     ctx.setLineDash([6*dpr,5*dpr]);
-    ctx.beginPath();ctx.moveTo(tx(HX),ty(HY));ctx.lineTo(tx(g.GX),ty(g.GY));ctx.stroke();
-    // ── H→M and M→G rigid bars (solid lines) ──
-    ctx.strokeStyle = '#90d8c0';
-    ctx.lineWidth = 2.5 * dpr;
+    ctx.beginPath();ctx.moveTo(...p(HX,HY));ctx.lineTo(...p(g.GX,g.GY));ctx.stroke();
     ctx.setLineDash([]);
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(tx(HX),    ty(HY));
-    ctx.lineTo(tx(g.MX),  ty(g.MY));
-    ctx.lineTo(tx(g.GX),  ty(g.GY));
-    ctx.stroke();
 
-    // Length labels on H-M and M-G
+    // ── H-M-G rigid rods: 3D cylindrical style, front (z=0) and back (z=BW) sets ──
+    // Helper: draw one rod segment with cylindrical shading at a given z
+    function drawRod3D(x1,y1,x2,y2,z,thick,bodyColor,shadowColor,hlColor){
+      const [csx1,csy1]=p(x1,y1,z), [csx2,csy2]=p(x2,y2,z);
+      const ang=Math.atan2(csy2-csy1,csx2-csx1);
+      const px=Math.cos(ang-Math.PI/2), py=Math.sin(ang-Math.PI/2);
+      const off=1.5*dpr;
+      ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash([]);
+      // shadow
+      ctx.strokeStyle=shadowColor; ctx.lineWidth=2*dpr;
+      ctx.beginPath();ctx.moveTo(csx1+px*off,csy1+py*off);ctx.lineTo(csx2+px*off,csy2+py*off);ctx.stroke();
+      // body
+      ctx.strokeStyle=bodyColor; ctx.lineWidth=thick;
+      ctx.beginPath();ctx.moveTo(csx1,csy1);ctx.lineTo(csx2,csy2);ctx.stroke();
+      // highlight
+      ctx.strokeStyle=hlColor; ctx.lineWidth=2.5*dpr;
+      ctx.beginPath();ctx.moveTo(csx1-px*off,csy1-py*off);ctx.lineTo(csx2-px*off,csy2-py*off);ctx.stroke();
+    }
+
+    // Depth connector lines between front and back rod endpoints (H, M, G)
+    ctx.strokeStyle='#90d8c055'; ctx.lineWidth=1.5*dpr; ctx.lineCap='round';
+    [[HX,HY],[g.MX,g.MY],[g.GX,g.GY]].forEach(([x,y])=>{
+      ctx.beginPath();ctx.moveTo(...p(x,y,0));ctx.lineTo(...p(x,y,BW));ctx.stroke();
+    });
+
+    // Back set (z=BW) — draw first, thinner, darker
+    drawRod3D(HX,HY,g.MX,g.MY, BW, 6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+    drawRod3D(g.MX,g.MY,g.GX,g.GY, BW, 6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+
+    // Front set (z=0) — draw second, full cylindrical style
+    drawRod3D(HX,HY,g.MX,g.MY, 0, 8*dpr,'#90d8c0','#508070','#c0f0e8');
+    drawRod3D(g.MX,g.MY,g.GX,g.GY, 0, 8*dpr,'#90d8c0','#508070','#c0f0e8');
+
+    // Length labels on front (z=0) H-M and M-G
     {
       const lfs = FS.dim * dpr;
       ctx.font = `${lfs}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
       const rigLbl = (g.LEN_HM * 100).toFixed(0) + 'cm';
       // H-M midpoint
-      const hm_mx = tx((HX + g.MX) / 2), hm_my = ty((HY + g.MY) / 2);
+      const [hm_mx, hm_my] = p((HX + g.MX) / 2, (HY + g.MY) / 2);
       const tw_hm = ctx.measureText(rigLbl).width + 8 * dpr;
       ctx.fillStyle = '#0e0f12'; ctx.fillRect(hm_mx - tw_hm/2, hm_my - lfs*0.85, tw_hm, lfs*1.3);
       ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, hm_mx, hm_my + lfs*0.35);
       // M-G midpoint
-      const mg_mx = tx((g.MX + g.GX) / 2), mg_my = ty((g.MY + g.GY) / 2);
+      const [mg_mx, mg_my] = p((g.MX + g.GX) / 2, (g.MY + g.GY) / 2);
       const tw_mg = ctx.measureText(rigLbl).width + 8 * dpr;
       ctx.fillStyle = '#0e0f12'; ctx.fillRect(mg_mx - tw_mg/2, mg_my - lfs*0.85, tw_mg, lfs*1.3);
       ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, mg_mx, mg_my + lfs*0.35);
@@ -336,8 +490,9 @@ function draw() {
     const lbl=(g.HG*100).toFixed(0)+'cm';
     const tw=ctx.measureText(lbl).width+8*dpr;
     ctx.textAlign='center';
-    ctx.fillStyle='#0e0f12'; ctx.fillRect(tx(mx)-tw/2,ty(my)-fs*0.85,tw,fs*1.3);
-    ctx.fillStyle=GRAY_DASH; ctx.fillText(lbl,tx(mx),ty(my)+fs*0.35);
+    const [hglx,hgly]=p(mx,my);
+    ctx.fillStyle='#0e0f12'; ctx.fillRect(hglx-tw/2,hgly-fs*0.85,tw,fs*1.3);
+    ctx.fillStyle=GRAY_DASH; ctx.fillText(lbl,hglx,hgly+fs*0.35);
 
     // ── G-H midpoint M → A dashed distance ──
     function dashedDistLine(x1,y1,x2,y2,lbl,color){
@@ -352,32 +507,33 @@ function draw() {
       ctx.fillStyle=color; ctx.fillText(lbl,mx2,my2+fs*0.35);
     }
     ctx.font=`${fs}px 'JetBrains Mono', monospace`;
-    dashedDistLine(tx(g.MX),ty(g.MY), tx(g.Aw.x),ty(g.Aw.y),
+    dashedDistLine(...p(g.MX,g.MY), ...p(g.Aw.x,g.Aw.y),
                    (g.MA*100).toFixed(0)+'cm', GRAY_DASH);
   }
 
   // ── Anchor points H, I ──
-  drawDiamond(tx(HX),ty(HY),'#7ae8b0','H',dpr);
-  drawDiamond(tx(REF_IX),ty(REF_IY),'#e8a87a','I',dpr);
+  drawDiamond(...p(HX,HY),'#7ae8b0','H',dpr);
+  drawDiamond(...p(REF_IX,REF_IY),'#e8a87a','I',dpr);
 
   // ── G point and M ──
   if(params.showQuarter){
-    drawQuarterPt(tx(g.GX),ty(g.GY),'G',dpr);
+    drawQuarterPt(...p(g.GX,g.GY),'G',dpr);
     // A→G distance label near G
     const agLbl = (params.gOffset * 100).toFixed(0) + 'cm';
     ctx.font = `${FS.dim*dpr}px 'JetBrains Mono', monospace`;
+    const [agx,agy]=p(g.GX,g.GY);
     ctx.fillStyle = '#c4894acc';
     ctx.textAlign = 'left';
-    ctx.fillText('AG:' + agLbl, tx(g.GX) + 12*dpr, ty(g.GY) + 18*dpr);
-    drawMidPt(tx(g.MX),ty(g.MY),'M',dpr);
+    ctx.fillText('AG:' + agLbl, agx + 12*dpr, agy + 18*dpr);
+    drawMidPt(...p(g.MX,g.MY),'M',dpr);
   }
 
   // ── Key points A B C D ──
-  drawKeyPt(tx(g.Aw.x),ty(g.Aw.y), '#e8c87a','A', 16,-16,dpr);
-  drawKeyPt(tx(g.Bw.x),ty(g.Bw.y), '#7ab8e8','B', 16,  4,dpr);
-  drawKeyPt(tx(g.Cw.x),ty(g.Cw.y), '#e87a7a','C', 16,  4,dpr);
+  drawKeyPt(...p(g.Aw.x,g.Aw.y), '#e8c87a','A', 16,-16,dpr);
+  drawKeyPt(...p(g.Bw.x,g.Bw.y), '#7ab8e8','B', 16,  4,dpr);
+  drawKeyPt(...p(g.Cw.x,g.Cw.y), '#e87a7a','C', 16,  4,dpr);
   if(params.showFold)
-    drawKeyPt(tx(g.Dw.x),ty(g.Dw.y),'#b07ae8','D', 16,  4,dpr);
+    drawKeyPt(...p(g.Dw.x,g.Dw.y),'#b07ae8','D', 16,  4,dpr);
 
   // ── Dimension lines ──
   if(params.showDims){
@@ -412,9 +568,9 @@ function draw() {
     // ── Projection dashed lines ──
     ctx.lineWidth=1*dpr; ctx.setLineDash([3*dpr,4*dpr]);
     ctx.strokeStyle=GRAY_DASH+'44';
-    ctx.beginPath();ctx.moveTo(tx(g.Aw.x),ty(g.Aw.y));ctx.lineTo(tx(g.Aw.x),ty(0));ctx.stroke();
-    ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(0));ctx.stroke();
-    ctx.beginPath();ctx.moveTo(tx(0),ty(g.Bw.y));ctx.lineTo(tx(g.Bw.x),ty(g.Bw.y));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(...p(g.Aw.x,g.Aw.y));ctx.lineTo(...p(g.Aw.x,0));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Bw.x,0));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(...p(0,g.Bw.y));ctx.lineTo(...p(g.Bw.x,g.Bw.y));ctx.stroke();
     ctx.setLineDash([]);
 
     // ── H→B dashed distance ──
@@ -422,9 +578,10 @@ function draw() {
       const HB = Math.hypot(g.Bw.x - HX, g.Bw.y - HY);
       ctx.strokeStyle = GRAY_DASH + '88'; ctx.lineWidth = 1.2*dpr;
       ctx.setLineDash([5*dpr, 4*dpr]);
-      ctx.beginPath(); ctx.moveTo(tx(HX), ty(HY)); ctx.lineTo(tx(g.Bw.x), ty(g.Bw.y)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(...p(HX,HY)); ctx.lineTo(...p(g.Bw.x,g.Bw.y)); ctx.stroke();
       ctx.setLineDash([]);
-      const hb_mx = (tx(HX)+tx(g.Bw.x))/2, hb_my = (ty(HY)+ty(g.Bw.y))/2;
+      const [hbx1,hby1]=p(HX,HY), [hbx2,hby2]=p(g.Bw.x,g.Bw.y);
+      const hb_mx = (hbx1+hbx2)/2, hb_my = (hby1+hby2)/2;
       const hbLbl = (HB*100).toFixed(0)+'cm';
       const hb_tw = ctx.measureText(hbLbl).width + 8*dpr;
       ctx.textAlign = 'center';
@@ -433,13 +590,13 @@ function draw() {
     }
 
     // ── A→B 段對地面投影 & B 對牆面投影高度 ──
-    dim(tx(g.Bw.x),ty(0), tx(g.Aw.x),ty(0), ((g.Aw.x-g.Bw.x)*100).toFixed(0)+'cm','#c4894a', o, true);
-    dim(tx(0),ty(0), tx(0),ty(g.Bw.y), (g.Bw.y*100).toFixed(0)+'cm','#7ab8e8',-o*2, false);
+    dim(...p(g.Bw.x,0), ...p(g.Aw.x,0), ((g.Aw.x-g.Bw.x)*100).toFixed(0)+'cm','#c4894a', o, true);
+    dim(...p(0,0), ...p(0,g.Bw.y), (g.Bw.y*100).toFixed(0)+'cm','#7ab8e8',-o*2, false);
 
-    dim(tx(0),ty(0), tx(0),ty(CEIL_H), CEIL_H.toFixed(2)+'m','#7ab8e8',-o,false);
-    dim(tx(0),ty(CEIL_H+0.1), tx(g.Aw.x),ty(CEIL_H+0.1), g.Aw.x.toFixed(3)+'m','#e8c87a',-o,true);
+    dim(...p(0,0), ...p(0,CEIL_H), CEIL_H.toFixed(2)+'m','#7ab8e8',-o,false);
+    dim(...p(0,CEIL_H+0.1), ...p(g.Aw.x,CEIL_H+0.1), g.Aw.x.toFixed(3)+'m','#e8c87a',-o,true);
     if(g.Cw.y>0.002)
-      dim(tx(g.Cw.x-0.1),ty(0), tx(g.Cw.x-0.1),ty(g.Cw.y), (g.Cw.y*100).toFixed(0)+'cm','#e87a7a',-o*0.75,false);
+      dim(...p(g.Cw.x-0.1,0), ...p(g.Cw.x-0.1,g.Cw.y), (g.Cw.y*100).toFixed(0)+'cm','#e87a7a',-o*0.75,false);
 
     // ── 地面外側端往內縮 → 主板外側面投影高度 ──
     if (g.projOnBoardY !== null) {
@@ -447,45 +604,50 @@ function draw() {
       ctx.font = `${fs}px 'JetBrains Mono', monospace`;
 
       // 地面內縮距離標示（水平 dim 線，位於地面下方）
-      dim(tx(rx), ty(0), tx(g.Ao.x), ty(0),
+      dim(...p(rx,0), ...p(g.Ao.x,0),
           (params.inwardOffset * 100).toFixed(0) + 'cm', GRAY_DASH, 26*dpr, true);
 
       // 垂直虛線：地面參考點 → 主板外側面交點
       ctx.strokeStyle = GRAY_DASH + '88'; ctx.lineWidth = 1.2*dpr;
       ctx.setLineDash([4*dpr, 4*dpr]);
-      ctx.beginPath(); ctx.moveTo(tx(rx), ty(0)); ctx.lineTo(tx(rx), ty(py)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(...p(rx,0)); ctx.lineTo(...p(rx,py)); ctx.stroke();
       ctx.setLineDash([]);
 
       // 交點標記
+      const [rxPx,rxPy0]=p(rx,0), [,rxPyp]=p(rx,py);
       ctx.fillStyle = GRAY_DASH;
-      ctx.beginPath(); ctx.arc(tx(rx), ty(py), 4*dpr, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(rxPx, rxPyp, 4*dpr, 0, Math.PI*2); ctx.fill();
 
       // 高度標籤（置中於垂直線，顯示在線右側）
       const heightLbl = (py * 100).toFixed(0) + 'cm';
-      const vlMidY = (ty(0) + ty(py)) / 2;
+      const vlMidY = (rxPy0 + rxPyp) / 2;
       const tw2 = ctx.measureText(heightLbl).width + 8*dpr;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#0e0f12'; ctx.fillRect(tx(rx) + 4*dpr, vlMidY - fs*0.85, tw2, fs*1.3);
-      ctx.fillStyle = GRAY_DASH; ctx.fillText(heightLbl, tx(rx) + 8*dpr, vlMidY + fs*0.35);
+      ctx.fillStyle = '#0e0f12'; ctx.fillRect(rxPx + 4*dpr, vlMidY - fs*0.85, tw2, fs*1.3);
+      ctx.fillStyle = GRAY_DASH; ctx.fillText(heightLbl, rxPx + 8*dpr, vlMidY + fs*0.35);
     }
 
-    // Angle arc at A
-    const arcR=44*dpr, wallDown=-Math.PI/2, bDir=g.boardDir;
+    // Angle arc at A (canvas-space directions, correct for any hViewAngle)
+    const arcR=44*dpr;
+    const [ax,ay]=p(g.Aw.x,g.Aw.y,0);
+    const [ax2,ay2]=p(g.Aw.x,0,0);
+    const wallDownDir=Math.atan2(ay2-ay,ax2-ax);
+    const [bx,by]=p(g.Bw.x,g.Bw.y,0);
+    const bDirCanvas=Math.atan2(by-ay,bx-ax);
     ctx.strokeStyle='#e8c87a88'; ctx.lineWidth=1.5*dpr; ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.arc(tx(g.Aw.x),ty(g.Aw.y),arcR,Math.min(wallDown,bDir),Math.max(wallDown,bDir));
+    ctx.arc(ax,ay,arcR,Math.min(wallDownDir,bDirCanvas),Math.max(wallDownDir,bDirCanvas));
     ctx.stroke();
-    const midA=(wallDown+bDir)/2;
+    const midA=(wallDownDir+bDirCanvas)/2;
     ctx.font=`${fs}px 'JetBrains Mono', monospace`;
     ctx.fillStyle='#e8c87a'; ctx.textAlign='center';
-    ctx.fillText(params.angle+'°',
-      tx(g.Aw.x)+Math.cos(midA)*(arcR+16*dpr),
-      ty(g.Aw.y)+Math.sin(midA)*(arcR+16*dpr));
+    ctx.fillText(params.angle+'°', ax+Math.cos(midA)*(arcR+16*dpr), ay+Math.sin(midA)*(arcR+16*dpr));
 
     // Thickness annotation at B
     ctx.strokeStyle=GRAY_DASH+'44'; ctx.lineWidth=1*dpr;
-    ctx.beginPath();ctx.moveTo(tx(g.Bw.x),ty(g.Bw.y));ctx.lineTo(tx(g.Bo.x),ty(g.Bo.y));ctx.stroke();
-    const tmx=(tx(g.Bw.x)+tx(g.Bo.x))/2, tmy=(ty(g.Bw.y)+ty(g.Bo.y))/2;
+    ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Bo.x,g.Bo.y));ctx.stroke();
+    const [tbwx,tbwy]=p(g.Bw.x,g.Bw.y), [tbox,tboy]=p(g.Bo.x,g.Bo.y);
+    const tmx=(tbwx+tbox)/2, tmy=(tbwy+tboy)/2;
     ctx.font=`${(FS.dim-1)*dpr}px 'JetBrains Mono', monospace`;
     ctx.fillStyle=GRAY_DASH+'88'; ctx.textAlign='left';
     ctx.fillText('5cm', tmx+8*dpr, tmy+4*dpr);
@@ -494,20 +656,36 @@ function draw() {
   // Room labels
   ctx.font=`${FS.room*dpr}px 'JetBrains Mono', monospace`;
   ctx.fillStyle='#5a5d6e'; ctx.textAlign='left';
-  ctx.fillText('牆面',  tx(0)-wt-4*dpr, ty(CEIL_H*0.5));
-  ctx.fillText('天花板',tx(0.04),        ty(CEIL_H+0.08));
-  ctx.fillText('地面',  tx(0.04),        ty(-0.04)+14*dpr);
+  // 牆面：顯示在牆面 3D 面的中間（z=BW/2）
+  const [rlwx,rlwy]=p(0,CEIL_H*0.5,BW*0.45);
+  ctx.fillText('牆面',  rlwx+4*dpr, rlwy);
+  const [rlcx,rlcy]=p(0.04,CEIL_H,BW*0.5);
+  ctx.fillText('天花板',rlcx, rlcy-6*dpr);
+  const [rlfx,rlfy]=p(0.04,-0.04);
+  ctx.fillText('地面',  rlfx, rlfy+14*dpr);
 
   ctx.font=`${FS.seg*dpr}px 'JetBrains Mono', monospace`;
   ctx.textAlign='center';
   ctx.fillStyle='#c4894a99';
-  ctx.fillText('A→B '+MAIN_LEN.toFixed(2)+'m',
-    tx((g.Ac.x+g.Bc.x)/2)+20*dpr, ty((g.Ac.y+g.Bc.y)/2)-8*dpr);
+  const [sxAB,syAB]=p((g.Ac.x+g.Bc.x)/2,(g.Ac.y+g.Bc.y)/2);
+  ctx.fillText('A→B '+MAIN_LEN.toFixed(2)+'m', sxAB+20*dpr, syAB-8*dpr);
   if(params.showFold){
     ctx.fillStyle='#7ab8e899';
-    ctx.fillText('B→D '+FOLD_LEN+'m',
-      tx((g.Bw.x+g.Dw.x)/2)+20*dpr, ty((g.Bw.y+g.Dw.y)/2)-8*dpr);
+    const [sxBD,syBD]=p((g.Bw.x+g.Dw.x)/2,(g.Bw.y+g.Dw.y)/2);
+    ctx.fillText('B→D '+FOLD_LEN+'m', sxBD+20*dpr, syBD-8*dpr);
   }
+}
+
+// Draw a polygon face in 3D oblique projection.
+// pts: array of {x, y, z} world coords; pFn: unified projection function p(x,y,z)→[cx,cy]
+function drawFace3D(pts, pFn, fillStyle, strokeStyle, lw) {
+  ctx.beginPath();
+  ctx.moveTo(...pFn(pts[0].x, pts[0].y, pts[0].z));
+  for (let i = 1; i < pts.length; i++)
+    ctx.lineTo(...pFn(pts[i].x, pts[i].y, pts[i].z));
+  ctx.closePath();
+  if (fillStyle)   { ctx.fillStyle   = fillStyle;  ctx.fill(); }
+  if (strokeStyle) { ctx.strokeStyle = strokeStyle; ctx.lineWidth = lw; ctx.stroke(); }
 }
 
 function drawKeyPt(px,py,color,label,lox,loy,dpr){
