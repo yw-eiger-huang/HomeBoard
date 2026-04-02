@@ -247,7 +247,7 @@ function draw() {
     const hc = h + d*OBL_COS;
     minH=Math.min(minH,hc); maxH=Math.max(maxH,hc);
   });
-  const sceneW = maxH - minH + 0.2, sceneH = CEIL_H * 1.22;
+  const sceneW = maxH - minH, sceneH = CEIL_H * 1.22;
   const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
   const OX = margin + viewOX + 44*dpr - minH*S;
