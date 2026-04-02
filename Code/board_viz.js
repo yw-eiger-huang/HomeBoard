@@ -247,7 +247,9 @@ function draw() {
     const hc = h + d*OBL_COS;
     minH=Math.min(minH,hc); maxH=Math.max(maxH,hc);
   });
-  const sceneW = maxH - minH, sceneH = CEIL_H * 1.22;
+  // sceneW uses the 2D formula so φ=0 scale matches the original 2D side view;
+  // depth offset is rendered visually but does not shrink the auto-scale.
+  const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
   const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
   const OX = margin + viewOX + 44*dpr - minH*S;
@@ -356,74 +358,93 @@ function draw() {
   ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── 3D Boards (Painter's algorithm: back → sides → caps → front) ──
+  // ── 3D Boards: depth-sorted painter's algorithm ──
   ctx.lineJoin='round'; ctx.lineCap='round';
-
-  // Helper: shorthand for board corner points at a given z
   const mb = (pt, z) => ({ x: pt.x, y: pt.y, z });
   const lw3 = 1.2 * dpr;
 
-  // ── Main board 3D prism ──
-  // 1. Back face (z=BW)
-  drawFace3D([mb(g.Aw,BW),mb(g.Bw,BW),mb(g.Bo,BW),mb(g.Ao,BW)],
-    p,'rgba(140,90,40,0.20)','#9a6030',lw3);
-  // 2. Outer/top connecting face (Ao→Bo front → Bo→Ao back)
-  drawFace3D([mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)],
-    p,'rgba(168,110,55,0.35)','#b07040',lw3);
-  // 3. End cap at A (top, 5cm thick)
-  drawFace3D([mb(g.Aw,0),mb(g.Ao,0),mb(g.Ao,BW),mb(g.Aw,BW)],
-    p,'rgba(120,78,35,0.45)','#8a5828',lw3);
-  // 4. End cap at B (bottom, 5cm thick)
-  drawFace3D([mb(g.Bw,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Bw,BW)],
-    p,'rgba(120,78,35,0.45)','#8a5828',lw3);
-  // 5. Front face (z=0)
-  ctx.beginPath();
-  ctx.moveTo(...p(g.Aw.x,g.Aw.y));
-  ctx.lineTo(...p(g.Bw.x,g.Bw.y));
-  ctx.lineTo(...p(g.Bo.x,g.Bo.y));
-  ctx.lineTo(...p(g.Ao.x,g.Ao.y));
-  ctx.closePath();
-  ctx.fillStyle='rgba(196,137,74,0.28)'; ctx.fill();
-  ctx.strokeStyle='#c4894a'; ctx.lineWidth=1.5*dpr; ctx.stroke();
+  // Average depth of a face: d(x,z) = -x·sinV + z·cosV (higher = further from observer)
+  const faceDepth = pts => pts.reduce((s,pt) => s + (-pt.x*sinV + pt.z*cosV), 0) / pts.length;
 
-  // Ghost C extension (dashed, front face only)
-  ctx.setLineDash([5*dpr,5*dpr]); ctx.lineWidth=1*dpr;
-  ctx.strokeStyle='rgba(136,136,160,0.35)';
-  ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Cw.x,g.Cw.y));ctx.stroke();
-  ctx.strokeStyle='rgba(136,136,160,0.2)';
-  ctx.beginPath();ctx.moveTo(...p(g.Bo.x,g.Bo.y));ctx.lineTo(...p(g.Co.x,g.Co.y));ctx.stroke();
-  ctx.setLineDash([]);
+  const boardFaces = [];
+  const addFace = (pts, fill, stroke, lw) => boardFaces.push({pts, fill, stroke, lw});
 
-  // ── Fold section 3D prism ──
+  // Main board: 6 faces (back, outer side, inner side, cap A, cap B, front)
+  addFace([mb(g.Aw,BW),mb(g.Bw,BW),mb(g.Bo,BW),mb(g.Ao,BW)],
+    'rgba(140,90,40,0.20)','#9a6030',lw3);
+  addFace([mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)],
+    'rgba(168,110,55,0.35)','#b07040',lw3);
+  addFace([mb(g.Aw,0),mb(g.Bw,0),mb(g.Bw,BW),mb(g.Aw,BW)],
+    'rgba(110,65,20,0.22)','#7a4a20',lw3);
+  addFace([mb(g.Aw,0),mb(g.Ao,0),mb(g.Ao,BW),mb(g.Aw,BW)],
+    'rgba(120,78,35,0.45)','#8a5828',lw3);
+  addFace([mb(g.Bw,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Bw,BW)],
+    'rgba(120,78,35,0.45)','#8a5828',lw3);
+  addFace([mb(g.Aw,0),mb(g.Bw,0),mb(g.Bo,0),mb(g.Ao,0)],
+    'rgba(196,137,74,0.28)','#c4894a',1.5*dpr);
+
+  // Fold section: 6 faces
   if(params.showFold){
-    // 6. Back face
-    drawFace3D([mb(g.Bw,BW),mb(g.Dw,BW),mb(g.Do,BW),mb(g.Bfo,BW)],
-      p,'rgba(60,100,140,0.18)','#3a6488',lw3);
-    // 7. Outer connecting face (Bfo→Do front → back)
-    drawFace3D([mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)],
-      p,'rgba(80,130,175,0.30)','#508aaf',lw3);
-    // 8. End cap at B (fold top, 5cm thick)
-    drawFace3D([mb(g.Bw,0),mb(g.Bfo,0),mb(g.Bfo,BW),mb(g.Bw,BW)],
-      p,'rgba(50,90,130,0.40)','#325a82',lw3);
-    // 9. End cap at D (fold bottom, 5cm thick)
-    drawFace3D([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
-      p,'rgba(50,90,130,0.40)','#325a82',lw3);
-    // 10. Front face (z=0)
-    ctx.beginPath();
-    ctx.moveTo(...p(g.Bw.x, g.Bw.y));
-    ctx.lineTo(...p(g.Dw.x, g.Dw.y));
-    ctx.lineTo(...p(g.Do.x, g.Do.y));
-    ctx.lineTo(...p(g.Bfo.x,g.Bfo.y));
-    ctx.closePath();
-    ctx.fillStyle='rgba(122,184,232,0.22)'; ctx.fill();
-    ctx.strokeStyle='#7ab8e8'; ctx.lineWidth=1.5*dpr; ctx.stroke();
+    addFace([mb(g.Bw,BW),mb(g.Dw,BW),mb(g.Do,BW),mb(g.Bfo,BW)],
+      'rgba(60,100,140,0.18)','#3a6488',lw3);
+    addFace([mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)],
+      'rgba(80,130,175,0.30)','#508aaf',lw3);
+    addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Dw,BW),mb(g.Bw,BW)],
+      'rgba(35,72,115,0.20)','#23487a',lw3);
+    addFace([mb(g.Bw,0),mb(g.Bfo,0),mb(g.Bfo,BW),mb(g.Bw,BW)],
+      'rgba(50,90,130,0.40)','#325a82',lw3);
+    addFace([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
+      'rgba(50,90,130,0.40)','#325a82',lw3);
+    addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Do,0),mb(g.Bfo,0)],
+      'rgba(122,184,232,0.22)','#7ab8e8',1.5*dpr);
   }
 
-  // Center line (dashed, main board front face only)
-  ctx.strokeStyle='rgba(136,136,160,0.22)'; ctx.lineWidth=1*dpr;
-  ctx.setLineDash([4*dpr,4*dpr]);
-  ctx.beginPath();ctx.moveTo(...p(g.Ac.x,g.Ac.y));ctx.lineTo(...p(g.Bc.x,g.Bc.y));ctx.stroke();
-  ctx.setLineDash([]);
+  // depth of a single 3D point
+  const ptDepth = (x, z) => -x*sinV + z*cosV;
+
+  // Drawable list: all depth-sorted elements (board faces, ghost, rods)
+  const drawList = boardFaces.map(f => ({
+    depth: faceDepth(f.pts),
+    drawFn: () => drawFace3D(f.pts, p, f.fill, f.stroke, f.lw)
+  }));
+
+  // Center line — same depth as front face of main board
+  const centerLineDepth = (ptDepth(g.Ac.x,0) + ptDepth(g.Bc.x,0)) / 2;
+  drawList.push({ depth: centerLineDepth, drawFn: () => {
+    ctx.strokeStyle='rgba(136,136,160,0.22)'; ctx.lineWidth=1*dpr;
+    ctx.setLineDash([4*dpr,4*dpr]);
+    ctx.beginPath();ctx.moveTo(...p(g.Ac.x,g.Ac.y));ctx.lineTo(...p(g.Bc.x,g.Bc.y));ctx.stroke();
+    ctx.setLineDash([]);
+  }});
+
+  // Helper: add a rod segment entry to the draw list
+  function addRod(x1,y1,x2,y2,z,thick,bodyColor,shadowColor,hlColor) {
+    const depth = (ptDepth(x1,z) + ptDepth(x2,z)) / 2;
+    drawList.push({ depth, drawFn: () => {
+      const [csx1,csy1]=p(x1,y1,z), [csx2,csy2]=p(x2,y2,z);
+      const ang=Math.atan2(csy2-csy1,csx2-csx1);
+      const rpx=Math.cos(ang-Math.PI/2), rpy=Math.sin(ang-Math.PI/2);
+      const off=1.5*dpr;
+      ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash([]);
+      ctx.strokeStyle=shadowColor; ctx.lineWidth=2*dpr;
+      ctx.beginPath();ctx.moveTo(csx1+rpx*off,csy1+rpy*off);ctx.lineTo(csx2+rpx*off,csy2+rpy*off);ctx.stroke();
+      ctx.strokeStyle=bodyColor; ctx.lineWidth=thick;
+      ctx.beginPath();ctx.moveTo(csx1,csy1);ctx.lineTo(csx2,csy2);ctx.stroke();
+      ctx.strokeStyle=hlColor; ctx.lineWidth=2.5*dpr;
+      ctx.beginPath();ctx.moveTo(csx1-rpx*off,csy1-rpy*off);ctx.lineTo(csx2-rpx*off,csy2-rpy*off);ctx.stroke();
+    }});
+  }
+
+  // Ghost C extension (dashed) — depth: front face of main board
+  const ghostDepth = (ptDepth(g.Bw.x,0) + ptDepth(g.Cw.x,0)) / 2;
+  drawList.push({ depth: ghostDepth, drawFn: () => {
+    ctx.setLineDash([5*dpr,5*dpr]); ctx.lineWidth=1*dpr;
+    ctx.strokeStyle='rgba(136,136,160,0.35)';
+    ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Cw.x,g.Cw.y));ctx.stroke();
+    ctx.strokeStyle='rgba(136,136,160,0.2)';
+    ctx.beginPath();ctx.moveTo(...p(g.Bo.x,g.Bo.y));ctx.lineTo(...p(g.Co.x,g.Co.y));ctx.stroke();
+    ctx.setLineDash([]);
+  }});
 
   // ── H→G dashed distance ──
   if(params.showQuarter){
@@ -432,38 +453,24 @@ function draw() {
     ctx.beginPath();ctx.moveTo(...p(HX,HY));ctx.lineTo(...p(g.GX,g.GY));ctx.stroke();
     ctx.setLineDash([]);
 
-    // ── H-M-G rigid rods: 3D cylindrical style, front (z=0) and back (z=BW) sets ──
-    // Helper: draw one rod segment with cylindrical shading at a given z
-    function drawRod3D(x1,y1,x2,y2,z,thick,bodyColor,shadowColor,hlColor){
-      const [csx1,csy1]=p(x1,y1,z), [csx2,csy2]=p(x2,y2,z);
-      const ang=Math.atan2(csy2-csy1,csx2-csx1);
-      const px=Math.cos(ang-Math.PI/2), py=Math.sin(ang-Math.PI/2);
-      const off=1.5*dpr;
-      ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash([]);
-      // shadow
-      ctx.strokeStyle=shadowColor; ctx.lineWidth=2*dpr;
-      ctx.beginPath();ctx.moveTo(csx1+px*off,csy1+py*off);ctx.lineTo(csx2+px*off,csy2+py*off);ctx.stroke();
-      // body
-      ctx.strokeStyle=bodyColor; ctx.lineWidth=thick;
-      ctx.beginPath();ctx.moveTo(csx1,csy1);ctx.lineTo(csx2,csy2);ctx.stroke();
-      // highlight
-      ctx.strokeStyle=hlColor; ctx.lineWidth=2.5*dpr;
-      ctx.beginPath();ctx.moveTo(csx1-px*off,csy1-py*off);ctx.lineTo(csx2-px*off,csy2-py*off);ctx.stroke();
-    }
-
-    // Depth connector lines between front and back rod endpoints (H, M, G)
+    // Depth connector lines (drawn before sort — always full depth span)
     ctx.strokeStyle='#90d8c055'; ctx.lineWidth=1.5*dpr; ctx.lineCap='round';
     [[HX,HY],[g.MX,g.MY],[g.GX,g.GY]].forEach(([x,y])=>{
       ctx.beginPath();ctx.moveTo(...p(x,y,0));ctx.lineTo(...p(x,y,BW));ctx.stroke();
     });
 
-    // Back set (z=BW) — draw first, thinner, darker
-    drawRod3D(HX,HY,g.MX,g.MY, BW, 6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
-    drawRod3D(g.MX,g.MY,g.GX,g.GY, BW, 6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+    // cosV≥0: z=BW is farther; cosV<0: z=0 is farther
+    const rodZFar  = cosV >= 0 ? BW : 0;
+    const rodZNear = cosV >= 0 ? 0  : BW;
 
-    // Front set (z=0) — draw second, full cylindrical style
-    drawRod3D(HX,HY,g.MX,g.MY, 0, 8*dpr,'#90d8c0','#508070','#c0f0e8');
-    drawRod3D(g.MX,g.MY,g.GX,g.GY, 0, 8*dpr,'#90d8c0','#508070','#c0f0e8');
+    addRod(HX,HY,g.MX,g.MY,      rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+    addRod(g.MX,g.MY,g.GX,g.GY,  rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+    addRod(HX,HY,g.MX,g.MY,      rodZNear, 8*dpr,'#90d8c0','#508070','#c0f0e8');
+    addRod(g.MX,g.MY,g.GX,g.GY,  rodZNear, 8*dpr,'#90d8c0','#508070','#c0f0e8');
+
+    // ── Execute depth-sorted draw (boards + ghost + rods all together) ──
+    drawList.sort((a,b) => b.depth - a.depth);
+    drawList.forEach(e => e.drawFn());
 
     // Length labels on front (z=0) H-M and M-G
     {
@@ -471,13 +478,13 @@ function draw() {
       ctx.font = `${lfs}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
       const rigLbl = (g.LEN_HM * 100).toFixed(0) + 'cm';
-      // H-M midpoint
-      const [hm_mx, hm_my] = p((HX + g.MX) / 2, (HY + g.MY) / 2);
+      // H-M midpoint (labels on the near/front rod set)
+      const [hm_mx, hm_my] = p((HX + g.MX) / 2, (HY + g.MY) / 2, rodZNear);
       const tw_hm = ctx.measureText(rigLbl).width + 8 * dpr;
       ctx.fillStyle = '#0e0f12'; ctx.fillRect(hm_mx - tw_hm/2, hm_my - lfs*0.85, tw_hm, lfs*1.3);
       ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, hm_mx, hm_my + lfs*0.35);
-      // M-G midpoint
-      const [mg_mx, mg_my] = p((g.MX + g.GX) / 2, (g.MY + g.GY) / 2);
+      // M-G midpoint (labels on the near/front rod set)
+      const [mg_mx, mg_my] = p((g.MX + g.GX) / 2, (g.MY + g.GY) / 2, rodZNear);
       const tw_mg = ctx.measureText(rigLbl).width + 8 * dpr;
       ctx.fillStyle = '#0e0f12'; ctx.fillRect(mg_mx - tw_mg/2, mg_my - lfs*0.85, tw_mg, lfs*1.3);
       ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, mg_mx, mg_my + lfs*0.35);
@@ -509,6 +516,10 @@ function draw() {
     ctx.font=`${fs}px 'JetBrains Mono', monospace`;
     dashedDistLine(...p(g.MX,g.MY), ...p(g.Aw.x,g.Aw.y),
                    (g.MA*100).toFixed(0)+'cm', GRAY_DASH);
+  } else {
+    // No rods — still need to sort+draw boards, ghost, center line
+    drawList.sort((a,b) => b.depth - a.depth);
+    drawList.forEach(e => e.drawFn());
   }
 
   // ── Anchor points H, I ──
