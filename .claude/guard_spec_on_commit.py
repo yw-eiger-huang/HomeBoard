@@ -29,3 +29,30 @@ if has_code and not has_spec:
             )
         }
     }))
+    sys.exit(0)
+
+# When a function spec (YYYYMMDD.md) is staged, its design spec (YYYYMMDD.design.md) must also be staged.
+func_spec_dates = {
+    re.search(r'(\d{8})\.md$', f).group(1)
+    for f in staged
+    if re.search(r'Spec[/\\]\d{8}\.md$', f)
+}
+design_spec_dates = {
+    re.search(r'(\d{8})\.design\.md$', f).group(1)
+    for f in staged
+    if re.search(r'Spec[/\\]\d{8}\.design\.md$', f)
+}
+missing = func_spec_dates - design_spec_dates
+if missing:
+    dates_str = ", ".join(sorted(missing))
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": (
+                f"Function spec(s) for {dates_str} are staged but the corresponding "
+                f"design spec(s) (Spec/{dates_str}.design.md) are not. "
+                "Update the design spec to reflect the function spec changes before committing."
+            )
+        }
+    }))
