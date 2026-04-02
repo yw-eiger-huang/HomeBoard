@@ -255,19 +255,20 @@ function draw() {
   const OBL_SIN = Math.sin(Math.PI / 6) * 0.5;
   const cosV = Math.cos(params.hViewAngle * Math.PI / 180);
   const sinV = Math.sin(params.hViewAngle * Math.PI / 180);
-  const corners = [[0,0],[AX_W+T+0.5,0],[0,BOARD_W],[AX_W+T+0.5,BOARD_W]];
-  let minH=Infinity, maxH=-Infinity;
-  corners.forEach(([x,z])=>{
-    const h = x*cosV + z*sinV, d = -x*sinV + z*cosV;
-    const hc = h + d*OBL_COS;
-    minH=Math.min(minH,hc); maxH=Math.max(maxH,hc);
-  });
   // sceneW uses the 2D formula so φ=0 scale matches the original 2D side view;
   // depth offset is rendered visually but does not shrink the auto-scale.
   const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
   const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
-  const OX = margin + viewOX + 44*dpr - minH*S;
+  // Pivot rotation around the horizontal centre of the scene.
+  // hcCenter0 is the projected horizontal coordinate of the centre at φ=0;
+  // hcCenter is that same coordinate at the current angle.
+  // Keeping OX such that (OX + hcCenter·S) is constant makes the scene
+  // rotate in-place rather than drifting left/right.
+  const cx = (AX_W+T+0.5)/2, cz = BOARD_W/2;
+  const hcCenter0 = cx + cz*OBL_COS;
+  const hcCenter  = (cx*cosV + cz*sinV) + (-cx*sinV + cz*cosV)*OBL_COS;
+  const OX = margin + viewOX + 44*dpr + (hcCenter0 - hcCenter)*S;
   const OY = margin + CEIL_H*S + viewOY;
   const BW = BOARD_W;
   const p = (x, y, z=0) => {
