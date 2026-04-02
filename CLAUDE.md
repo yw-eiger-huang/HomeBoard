@@ -29,7 +29,7 @@ Single-file HTML5 canvas application (`Code/board_viz.html`) with no frameworks 
 - `CEIL_H = 2.5` m (room height)
 - `AX_W = 3.048 × sin(40°) ≈ 1.9593` m (A point x, fixed)
 
-**Spec:** The latest technical specification is always the **highest-dated file** in `Spec/` (e.g. `Spec/20260328.md`). It is written in Traditional Chinese and covers all point coordinate formulas, fold sync logic, and visual design requirements. Always read the latest spec file — do not rely on older dated files.
+**Spec:** Technical specifications are in `Spec/` as dated `.md` files (e.g. `Spec/20260328.md`), written in Traditional Chinese, covering point coordinate formulas, fold sync logic, and visual design requirements.
 
 ## Terminology
 
