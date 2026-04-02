@@ -32,6 +32,16 @@
             "statusMessage": "Checking CLAUDE.md branch guard..."
           }
         ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python 'D:/CodeSpace/HomeBoard/.claude/guard_spec_file.py'",
+            "statusMessage": "Checking spec file naming..."
+          }
+        ]
       }
     ]
   }
