@@ -53,7 +53,7 @@ Hosted on **GitHub Pages** at:
 - **When modifying `CLAUDE.md`**, review each change and consider whether it would be better enforced as a hook in `.claude/settings.json` rather than as a behavioral instruction.
 - **Always end every response** with: `Request complete. Waiting for next instruction.`
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
-- **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes.
+- **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes. A hook will block any `git commit` that stages `Code/` files without a `Spec/` file.
 - **When updating the spec**, ask the user whether to create a new dated file or update the existing highest-dated file. Do not create a new `Spec/YYYYMMDD.md` without asking — a hook will block the attempt anyway.
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
 - **When creating a new spec file**, write the content in a polished and compacted style: use `|·|` notation for distances, merge subsections that share the same structure, avoid repeating formulas already stated elsewhere (cross-reference instead), and remove verbose CSS/implementation detail in favor of concise prose or tables.
