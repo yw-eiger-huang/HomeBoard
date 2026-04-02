@@ -16,7 +16,7 @@ const AY   = CEIL_H; // 2.5
 const HX = 0, HY = CEIL_H;
 const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
 
-let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, hViewAngle: 0, showDims: true, showFold: true, showQuarter: true };
+let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, hViewAngle: 0, show3D: true, showDims: true, showFold: true, showQuarter: true };
 // gOffset range: 1.75 ~ 2.15 m
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
@@ -174,10 +174,13 @@ hViewSlider.addEventListener('input', () => {
   draw();
 });
 
-['togDims','togFold','togQuarter'].forEach((id,i)=>{
-  const keys=['showDims','showFold','showQuarter'];
+['tog3D','togDims','togFold','togQuarter'].forEach((id,i)=>{
+  const keys=['show3D','showDims','showFold','showQuarter'];
   document.getElementById(id).addEventListener('click',function(){
-    params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]); draw();
+    params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]);
+    // hide/show hViewAngle row when toggling 3D
+    if(id==='tog3D') document.getElementById('hViewAngle').closest('.param-row').style.display = params.show3D ? '' : 'none';
+    draw();
   });
 });
 
@@ -261,101 +264,74 @@ function draw() {
   };
   const tx = x => p(x,0,0)[0];
 
-  // ── 3D Room surfaces ──
+  // ── Room surfaces ──
   const roomMaxX = AX_W + 0.6;
   const floorMaxX = AX_W + 0.5;
   ctx.lineJoin = 'miter'; ctx.lineCap = 'butt'; ctx.setLineDash([]);
 
-  // Wall face (x=0 plane, z=0→BW, y=0→CEIL_H)
-  ctx.fillStyle = '#2d3548';
-  ctx.beginPath();
-  ctx.moveTo(...p(0,0,0));
-  ctx.lineTo(...p(0,0,BW));
-  ctx.lineTo(...p(0,CEIL_H,BW));
-  ctx.lineTo(...p(0,CEIL_H,0));
-  ctx.closePath(); ctx.fill();
-
-  // Wall grid lines
-  ctx.strokeStyle = '#3a4060'; ctx.lineWidth = 0.6*dpr;
-  for (let iy = 1; iy < 5; iy++) {
-    const wy = iy * CEIL_H / 5;
+  if(params.show3D){
+    // Wall face (x=0 plane, z=0→BW, y=0→CEIL_H)
+    ctx.fillStyle = '#2d3548';
     ctx.beginPath();
-    ctx.moveTo(...p(0,wy,0));
-    ctx.lineTo(...p(0,wy,BW));
-    ctx.stroke();
-  }
-  // Wall front & back edges
-  ctx.strokeStyle = '#4a5070'; ctx.lineWidth = 1.2*dpr;
-  ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
-  ctx.strokeStyle = '#3a4060'; ctx.lineWidth = 0.8*dpr;
-  ctx.beginPath(); ctx.moveTo(...p(0,0,BW)); ctx.lineTo(...p(0,CEIL_H,BW)); ctx.stroke();
+    ctx.moveTo(...p(0,0,0));
+    ctx.lineTo(...p(0,0,BW));
+    ctx.lineTo(...p(0,CEIL_H,BW));
+    ctx.lineTo(...p(0,CEIL_H,0));
+    ctx.closePath(); ctx.fill();
+    // Wall grid lines
+    ctx.strokeStyle = '#3a4060'; ctx.lineWidth = 0.6*dpr;
+    for (let iy = 1; iy < 5; iy++) {
+      const wy = iy * CEIL_H / 5;
+      ctx.beginPath(); ctx.moveTo(...p(0,wy,0)); ctx.lineTo(...p(0,wy,BW)); ctx.stroke();
+    }
+    ctx.strokeStyle = '#4a5070'; ctx.lineWidth = 1.2*dpr;
+    ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
+    ctx.strokeStyle = '#3a4060'; ctx.lineWidth = 0.8*dpr;
+    ctx.beginPath(); ctx.moveTo(...p(0,0,BW)); ctx.lineTo(...p(0,CEIL_H,BW)); ctx.stroke();
 
-  // Ceiling face (y=CEIL_H plane, x=0→roomMaxX, z=0→BW)
-  ctx.fillStyle = '#22263380';
-  ctx.beginPath();
-  ctx.moveTo(...p(0,CEIL_H,0));
-  ctx.lineTo(...p(roomMaxX,CEIL_H,0));
-  ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
-  ctx.lineTo(...p(0,CEIL_H,BW));
-  ctx.closePath(); ctx.fill();
-
-  // Ceiling grid lines (x direction)
-  ctx.strokeStyle = '#3a406088'; ctx.lineWidth = 0.6*dpr;
-  const ceilXStep = roomMaxX / 4;
-  for (let ix = 0; ix <= 4; ix++) {
-    const cx = ix * ceilXStep;
+    // Ceiling face
+    ctx.fillStyle = '#22263380';
     ctx.beginPath();
-    ctx.moveTo(...p(cx,CEIL_H,0));
-    ctx.lineTo(...p(cx,CEIL_H,BW));
-    ctx.stroke();
-  }
-  // Ceiling grid lines (z direction)
-  const ceilZStep = BW / 4;
-  for (let iz = 0; iz <= 4; iz++) {
-    const cz = iz * ceilZStep;
-    ctx.beginPath();
-    ctx.moveTo(...p(0,CEIL_H,cz));
-    ctx.lineTo(...p(roomMaxX,CEIL_H,cz));
-    ctx.stroke();
-  }
-  // Ceiling border edges
-  ctx.strokeStyle = '#3a4070'; ctx.lineWidth = 1*dpr;
-  ctx.beginPath();
-  ctx.moveTo(...p(0,CEIL_H,0));
-  ctx.lineTo(...p(roomMaxX,CEIL_H,0));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(...p(0,CEIL_H,BW));
-  ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(...p(0,CEIL_H,0));
-  ctx.lineTo(...p(0,CEIL_H,BW));
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(...p(roomMaxX,CEIL_H,0));
-  ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
-  ctx.stroke();
+    ctx.moveTo(...p(0,CEIL_H,0));
+    ctx.lineTo(...p(roomMaxX,CEIL_H,0));
+    ctx.lineTo(...p(roomMaxX,CEIL_H,BW));
+    ctx.lineTo(...p(0,CEIL_H,BW));
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#3a406088'; ctx.lineWidth = 0.6*dpr;
+    const ceilXStep = roomMaxX / 4;
+    for (let ix = 0; ix <= 4; ix++) {
+      const cx = ix * ceilXStep;
+      ctx.beginPath(); ctx.moveTo(...p(cx,CEIL_H,0)); ctx.lineTo(...p(cx,CEIL_H,BW)); ctx.stroke();
+    }
+    const ceilZStep = BW / 4;
+    for (let iz = 0; iz <= 4; iz++) {
+      const cz = iz * ceilZStep;
+      ctx.beginPath(); ctx.moveTo(...p(0,CEIL_H,cz)); ctx.lineTo(...p(roomMaxX,CEIL_H,cz)); ctx.stroke();
+    }
+    ctx.strokeStyle = '#3a4070'; ctx.lineWidth = 1*dpr;
+    ctx.beginPath(); ctx.moveTo(...p(0,CEIL_H,0));        ctx.lineTo(...p(roomMaxX,CEIL_H,0));  ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...p(0,CEIL_H,BW));       ctx.lineTo(...p(roomMaxX,CEIL_H,BW)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...p(0,CEIL_H,0));        ctx.lineTo(...p(0,CEIL_H,BW));        ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(...p(roomMaxX,CEIL_H,0)); ctx.lineTo(...p(roomMaxX,CEIL_H,BW)); ctx.stroke();
 
-  // Floor edges (front line + depth line)
+    // Floor depth line
+    ctx.strokeStyle = '#2a2d3866'; ctx.lineWidth = 1*dpr;
+    ctx.setLineDash([7*dpr,7*dpr]);
+    ctx.beginPath();
+    ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,0,BW)); ctx.lineTo(...p(floorMaxX,0,BW));
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Wall-floor vertical corner edge (dashed)
+    ctx.strokeStyle = '#3a406055'; ctx.lineWidth = 1*dpr;
+    ctx.setLineDash([4*dpr,4*dpr]);
+    ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Floor front edge (always shown)
   ctx.strokeStyle = '#2a2d38'; ctx.lineWidth = 1.5*dpr;
   ctx.setLineDash([7*dpr,7*dpr]);
-  ctx.beginPath();
-  ctx.moveTo(...p(-0.15,0,0));
-  ctx.lineTo(...p(floorMaxX,0,0));
-  ctx.stroke();
-  ctx.strokeStyle = '#2a2d3866'; ctx.lineWidth = 1*dpr;
-  ctx.beginPath();
-  ctx.moveTo(...p(0,0,0));
-  ctx.lineTo(...p(0,0,BW));
-  ctx.lineTo(...p(floorMaxX,0,BW));
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Wall-floor & wall-ceiling corner edges (front)
-  ctx.strokeStyle = '#3a406055'; ctx.lineWidth = 1*dpr;
-  ctx.setLineDash([4*dpr,4*dpr]);
-  ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(...p(-0.15,0,0)); ctx.lineTo(...p(floorMaxX,0,0)); ctx.stroke();
   ctx.setLineDash([]);
 
   // ── 3D Boards: depth-sorted painter's algorithm ──
@@ -369,32 +345,36 @@ function draw() {
   const boardFaces = [];
   const addFace = (pts, fill, stroke, lw) => boardFaces.push({pts, fill, stroke, lw});
 
-  // Main board: 6 faces (back, outer side, inner side, cap A, cap B, front)
-  addFace([mb(g.Aw,BW),mb(g.Bw,BW),mb(g.Bo,BW),mb(g.Ao,BW)],
-    'rgba(140,90,40,0.20)','#9a6030',lw3);
-  addFace([mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)],
-    'rgba(168,110,55,0.35)','#b07040',lw3);
-  addFace([mb(g.Aw,0),mb(g.Bw,0),mb(g.Bw,BW),mb(g.Aw,BW)],
-    'rgba(110,65,20,0.22)','#7a4a20',lw3);
-  addFace([mb(g.Aw,0),mb(g.Ao,0),mb(g.Ao,BW),mb(g.Aw,BW)],
-    'rgba(120,78,35,0.45)','#8a5828',lw3);
-  addFace([mb(g.Bw,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Bw,BW)],
-    'rgba(120,78,35,0.45)','#8a5828',lw3);
+  // Main board: front face always; back/side/cap faces only in 3D mode
+  if(params.show3D){
+    addFace([mb(g.Aw,BW),mb(g.Bw,BW),mb(g.Bo,BW),mb(g.Ao,BW)],
+      'rgba(140,90,40,0.20)','#9a6030',lw3);
+    addFace([mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)],
+      'rgba(168,110,55,0.35)','#b07040',lw3);
+    addFace([mb(g.Aw,0),mb(g.Bw,0),mb(g.Bw,BW),mb(g.Aw,BW)],
+      'rgba(110,65,20,0.22)','#7a4a20',lw3);
+    addFace([mb(g.Aw,0),mb(g.Ao,0),mb(g.Ao,BW),mb(g.Aw,BW)],
+      'rgba(120,78,35,0.45)','#8a5828',lw3);
+    addFace([mb(g.Bw,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Bw,BW)],
+      'rgba(120,78,35,0.45)','#8a5828',lw3);
+  }
   addFace([mb(g.Aw,0),mb(g.Bw,0),mb(g.Bo,0),mb(g.Ao,0)],
     'rgba(196,137,74,0.28)','#c4894a',1.5*dpr);
 
-  // Fold section: 6 faces
+  // Fold section
   if(params.showFold){
-    addFace([mb(g.Bw,BW),mb(g.Dw,BW),mb(g.Do,BW),mb(g.Bfo,BW)],
-      'rgba(60,100,140,0.18)','#3a6488',lw3);
-    addFace([mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)],
-      'rgba(80,130,175,0.30)','#508aaf',lw3);
-    addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Dw,BW),mb(g.Bw,BW)],
-      'rgba(35,72,115,0.20)','#23487a',lw3);
-    addFace([mb(g.Bw,0),mb(g.Bfo,0),mb(g.Bfo,BW),mb(g.Bw,BW)],
-      'rgba(50,90,130,0.40)','#325a82',lw3);
-    addFace([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
-      'rgba(50,90,130,0.40)','#325a82',lw3);
+    if(params.show3D){
+      addFace([mb(g.Bw,BW),mb(g.Dw,BW),mb(g.Do,BW),mb(g.Bfo,BW)],
+        'rgba(60,100,140,0.18)','#3a6488',lw3);
+      addFace([mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)],
+        'rgba(80,130,175,0.30)','#508aaf',lw3);
+      addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Dw,BW),mb(g.Bw,BW)],
+        'rgba(35,72,115,0.20)','#23487a',lw3);
+      addFace([mb(g.Bw,0),mb(g.Bfo,0),mb(g.Bfo,BW),mb(g.Bw,BW)],
+        'rgba(50,90,130,0.40)','#325a82',lw3);
+      addFace([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
+        'rgba(50,90,130,0.40)','#325a82',lw3);
+    }
     addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Do,0),mb(g.Bfo,0)],
       'rgba(122,184,232,0.22)','#7ab8e8',1.5*dpr);
   }
@@ -453,18 +433,19 @@ function draw() {
     ctx.beginPath();ctx.moveTo(...p(HX,HY));ctx.lineTo(...p(g.GX,g.GY));ctx.stroke();
     ctx.setLineDash([]);
 
-    // Depth connector lines (drawn before sort — always full depth span)
-    ctx.strokeStyle='#90d8c055'; ctx.lineWidth=1.5*dpr; ctx.lineCap='round';
-    [[HX,HY],[g.MX,g.MY],[g.GX,g.GY]].forEach(([x,y])=>{
-      ctx.beginPath();ctx.moveTo(...p(x,y,0));ctx.lineTo(...p(x,y,BW));ctx.stroke();
-    });
-
     // cosV≥0: z=BW is farther; cosV<0: z=0 is farther
     const rodZFar  = cosV >= 0 ? BW : 0;
     const rodZNear = cosV >= 0 ? 0  : BW;
 
-    addRod(HX,HY,g.MX,g.MY,      rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
-    addRod(g.MX,g.MY,g.GX,g.GY,  rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+    if(params.show3D){
+      // Depth connector lines
+      ctx.strokeStyle='#90d8c055'; ctx.lineWidth=1.5*dpr; ctx.lineCap='round';
+      [[HX,HY],[g.MX,g.MY],[g.GX,g.GY]].forEach(([x,y])=>{
+        ctx.beginPath();ctx.moveTo(...p(x,y,0));ctx.lineTo(...p(x,y,BW));ctx.stroke();
+      });
+      addRod(HX,HY,g.MX,g.MY,      rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+      addRod(g.MX,g.MY,g.GX,g.GY,  rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
+    }
     addRod(HX,HY,g.MX,g.MY,      rodZNear, 8*dpr,'#90d8c0','#508070','#c0f0e8');
     addRod(g.MX,g.MY,g.GX,g.GY,  rodZNear, 8*dpr,'#90d8c0','#508070','#c0f0e8');
 
@@ -667,11 +648,12 @@ function draw() {
   // Room labels
   ctx.font=`${FS.room*dpr}px 'JetBrains Mono', monospace`;
   ctx.fillStyle='#5a5d6e'; ctx.textAlign='left';
-  // 牆面：顯示在牆面 3D 面的中間（z=BW/2）
-  const [rlwx,rlwy]=p(0,CEIL_H*0.5,BW*0.45);
-  ctx.fillText('牆面',  rlwx+4*dpr, rlwy);
-  const [rlcx,rlcy]=p(0.04,CEIL_H,BW*0.5);
-  ctx.fillText('天花板',rlcx, rlcy-6*dpr);
+  if(params.show3D){
+    const [rlwx,rlwy]=p(0,CEIL_H*0.5,BW*0.45);
+    ctx.fillText('牆面',  rlwx+4*dpr, rlwy);
+    const [rlcx,rlcy]=p(0.04,CEIL_H,BW*0.5);
+    ctx.fillText('天花板',rlcx, rlcy-6*dpr);
+  }
   const [rlfx,rlfy]=p(0.04,-0.04);
   ctx.fillText('地面',  rlfx, rlfy+14*dpr);
 
