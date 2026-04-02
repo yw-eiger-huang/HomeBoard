@@ -174,12 +174,24 @@ hViewSlider.addEventListener('input', () => {
   draw();
 });
 
+let savedHViewAngle = params.hViewAngle;
+
+function setHViewAngle(deg) {
+  params.hViewAngle = deg;
+  hViewSlider.value = deg;
+  hViewValEl.textContent = deg.toFixed(0) + '°';
+}
+
 ['tog3D','togDims','togFold','togQuarter'].forEach((id,i)=>{
   const keys=['show3D','showDims','showFold','showQuarter'];
   document.getElementById(id).addEventListener('click',function(){
     params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]);
-    // hide/show hViewAngle row when toggling 3D
-    if(id==='tog3D') document.getElementById('hViewAngle').closest('.param-row').style.display = params.show3D ? '' : 'none';
+    // hide/show hViewAngle row when toggling 3D; save/restore angle
+    if(id==='tog3D'){
+      document.getElementById('hViewAngle').closest('.param-row').style.display = params.show3D ? '' : 'none';
+      if(!params.show3D){ savedHViewAngle = params.hViewAngle; setHViewAngle(0); }
+      else               { setHViewAngle(savedHViewAngle); }
+    }
     draw();
   });
 });
