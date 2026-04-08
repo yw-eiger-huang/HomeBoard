@@ -4,6 +4,11 @@ const ctx = canvas.getContext('2d');
 const BOARD_LEN = 3.048, FOLD_LEN = 0.65, MAIN_LEN = BOARD_LEN - FOLD_LEN;
 const CEIL_H = 2.5, T = 0.05, HT = T / 2;
 const BOARD_W = 3.66; // 板寬（Z 軸深度，公尺）
+const HOLE_R_M = 0.006; // 圓孔半徑 0.6 cm（直徑 1.2 cm）
+const SCREW_Z = Array.from({length:17},(_,i)=>0.23+i*0.20); // 17 列 z 位置
+const SCREW_U = Array.from({length:15},(_,i)=>0.10+i*0.20); // 15 行，距 D 端（m）
+const CELL_Z  = Array.from({length:16},(_,i)=>0.33+i*0.20); // 16 格心 z 位置
+const CELL_U  = Array.from({length:14},(_,i)=>0.20+i*0.20); // 14 格心行，距 D 端（m）
 const LABEL_RED = '#ff4d4d';
 const GRAY_DASH = '#8888a0';
 const FS = { label: 15, dim: 13, room: 12, seg: 12 };
@@ -16,7 +21,7 @@ const AY   = CEIL_H; // 2.5
 const HX = 0, HY = CEIL_H;
 const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
 
-let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, hViewAngle: 0, show3D: true, showDims: true, showFold: true, showQuarter: true };
+let params = { angle: 40, inwardOffset: 1.0, gOffset: 1.80, hViewAngle: 0, show3D: true, showDims: true, showFold: true, showQuarter: true, showScrewHoles: true };
 // gOffset range: 1.75 ~ 2.15 m
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
@@ -117,7 +122,7 @@ function getGeom() {
   const projOnBoardY = (t_proj >= 0 && t_proj <= 1) ? Bo.y + t_proj * (Ao.y - Bo.y) : null;
 
   return { Aw,Ao,Ac, Bw,Bo,Bc,Bfo, Cw,Co, Dw,Do,
-           boardDir, foldDir, fdx,fdy, fnx,fny,
+           boardDir, foldDir, fdx,fdy, fnx,fny, ddx,ddy,
            GX,GY, HG, LEN_HM, MX,MY,MA,
            refFloorX, projOnBoardY };
 }
@@ -182,8 +187,8 @@ function setHViewAngle(deg) {
   hViewValEl.textContent = deg.toFixed(0) + '°';
 }
 
-['tog3D','togDims','togFold','togQuarter'].forEach((id,i)=>{
-  const keys=['show3D','showDims','showFold','showQuarter'];
+['tog3D','togDims','togFold','togQuarter','togScrewHoles'].forEach((id,i)=>{
+  const keys=['show3D','showDims','showFold','showQuarter','showScrewHoles'];
   document.getElementById(id).addEventListener('click',function(){
     params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]);
     // hide/show hViewAngle row when toggling 3D; save/restore angle
@@ -426,6 +431,68 @@ function draw() {
       ctx.strokeStyle=hlColor; ctx.lineWidth=2.5*dpr;
       ctx.beginPath();ctx.moveTo(csx1-rpx*off,csy1-rpy*off);ctx.lineTo(csx2-rpx*off,csy2-rpy*off);ctx.stroke();
     }});
+  }
+
+  // ── Screw holes on visible face (外側面 or 內側面) ──
+  if (params.showScrewHoles) {
+    // Signed area of projected polygon — determines face winding (visibility)
+    const sArea = proj => {
+      let a=0;
+      for(let i=0;i<proj.length;i++){const[x1,y1]=proj[i],[x2,y2]=proj[(i+1)%proj.length];a+=x1*y2-x2*y1;}
+      return a;
+    };
+    // 3D point on outer (true) or inner (false) board face at u_from_D from D end, z_w along width
+    const holePt = (u_from_D, z_w, isOuter) => {
+      if (u_from_D < FOLD_LEN) {
+        const r = isOuter ? g.Do : g.Dw;
+        return { x: r.x - u_from_D*g.fdx, y: r.y - u_from_D*g.fdy, z: z_w };
+      } else {
+        const u_m = BOARD_LEN - u_from_D;
+        const r = isOuter ? g.Ao : g.Aw;
+        return { x: r.x + u_m*g.ddx, y: r.y + u_m*g.ddy, z: z_w };
+      }
+    };
+    const r_px = Math.max(HOLE_R_M * S, 1.5*dpr);
+
+    // Main board face
+    const mainOF = [mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)];
+    const mainIF = [mb(g.Aw,0),mb(g.Bw,0),mb(g.Bw,BW),mb(g.Aw,BW)];
+    const mainIsOuter = sArea(mainOF.map(pt=>p(pt.x,pt.y,pt.z))) < 0;
+    const mainVisDepth = faceDepth(mainIsOuter ? mainOF : mainIF);
+    drawList.push({ depth: mainVisDepth - 0.001, drawFn: () => {
+      ctx.fillStyle = 'rgba(255,255,255,0.80)';
+      SCREW_U.filter(u=>u>=FOLD_LEN).forEach(u => SCREW_Z.forEach(z_w => {
+        const pt=holePt(u,z_w,mainIsOuter);
+        const[cx,cy]=p(pt.x,pt.y,pt.z);
+        ctx.beginPath();ctx.arc(cx,cy,r_px,0,Math.PI*2);ctx.fill();
+      }));
+      CELL_U.filter(u=>u>=FOLD_LEN).forEach(u => CELL_Z.forEach(z_w => {
+        const pt=holePt(u,z_w,mainIsOuter);
+        const[cx,cy]=p(pt.x,pt.y,pt.z);
+        ctx.beginPath();ctx.arc(cx,cy,r_px,0,Math.PI*2);ctx.fill();
+      }));
+    }});
+
+    // Fold section face (only if fold is shown)
+    if (params.showFold) {
+      const foldOF = [mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)];
+      const foldIF = [mb(g.Bw,0),mb(g.Dw,0),mb(g.Dw,BW),mb(g.Bw,BW)];
+      const foldIsOuter = sArea(foldOF.map(pt=>p(pt.x,pt.y,pt.z))) < 0;
+      const foldVisDepth = faceDepth(foldIsOuter ? foldOF : foldIF);
+      drawList.push({ depth: foldVisDepth - 0.001, drawFn: () => {
+        ctx.fillStyle = 'rgba(255,255,255,0.80)';
+        SCREW_U.filter(u=>u<FOLD_LEN).forEach(u => SCREW_Z.forEach(z_w => {
+          const pt=holePt(u,z_w,foldIsOuter);
+          const[cx,cy]=p(pt.x,pt.y,pt.z);
+          ctx.beginPath();ctx.arc(cx,cy,r_px,0,Math.PI*2);ctx.fill();
+        }));
+        CELL_U.filter(u=>u<FOLD_LEN).forEach(u => CELL_Z.forEach(z_w => {
+          const pt=holePt(u,z_w,foldIsOuter);
+          const[cx,cy]=p(pt.x,pt.y,pt.z);
+          ctx.beginPath();ctx.arc(cx,cy,r_px,0,Math.PI*2);ctx.fill();
+        }));
+      }});
+    }
   }
 
   // Ghost C extension (dashed) — depth: front face of main board
