@@ -434,7 +434,7 @@ function draw() {
   }
 
   // ── Screw holes on visible face (外側面 or 內側面) ──
-  if (params.showScrewHoles) {
+  if (params.show3D && params.showScrewHoles) {
     // Signed area of projected polygon — determines face winding (visibility)
     const sArea = proj => {
       let a=0;
