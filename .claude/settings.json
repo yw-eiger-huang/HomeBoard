@@ -1,5 +1,15 @@
 {
   "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo =============================="
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",
@@ -20,6 +30,11 @@
             "type": "command",
             "command": "python 'D:/CodeSpace/HomeBoard/.claude/guard_spec_on_commit.py'",
             "statusMessage": "Checking spec is updated before commit..."
+          },
+          {
+            "type": "command",
+            "command": "python 'D:/CodeSpace/HomeBoard/.claude/guard_branch_switch.py'",
+            "statusMessage": "Checking working tree before branch operation..."
           }
         ]
       },

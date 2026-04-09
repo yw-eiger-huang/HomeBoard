@@ -49,13 +49,8 @@ Hosted on **GitHub Pages** at:
 ## Working Rules
 
 - **Do not commit or push** unless explicitly asked by the user.
-- **Do not create or switch branches** when there are untracked files or modified-but-not-staged files.
-- **When modifying `CLAUDE.md`**, review each change and consider whether it would be better enforced as a hook in `.claude/settings.json` rather than as a behavioral instruction.
-- **Always end every response** with: `==============================`
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
-- **Before committing**, always confirm that the latest spec file in `Spec/` (highest-dated `.md`) has been updated to reflect the current changes. A hook will block any `git commit` that stages `Code/` files without a `Spec/` file.
-- **When updating the spec**, ask the user whether to create a new dated file or update the existing highest-dated file. Do not create a new `Spec/YYYYMMDD.md` without asking — a hook will block the attempt anyway.
-- **Design spec must stay in sync**: whenever a function spec (`Spec/YYYYMMDD.md`) is updated, the corresponding design spec (`Spec/YYYYMMDD.design.md`) must also be updated in the same commit. A hook will block any `git commit` that stages a function spec without its design spec counterpart.
+- **When updating the spec**, ask the user whether to create a new dated file or update the existing highest-dated file. (A hook blocks unauthorized branch switches with dirty working tree, new spec file creation, and commits that stage `Code/` without a `Spec/` file or a function spec without its design spec counterpart.)
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
 - **When starting a new session**, read both the latest function spec (`Spec/YYYYMMDD.md`) and the latest design spec (`Spec/YYYYMMDD.design.md`) to understand the current state of the project. Do not rely on memory or prior context alone.
 - **When creating a new spec file**, write the content in a polished and compacted style: use `|·|` notation for distances, merge subsections that share the same structure, avoid repeating formulas already stated elsewhere (cross-reference instead), and remove verbose CSS/implementation detail in favor of concise prose or tables.
