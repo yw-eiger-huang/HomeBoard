@@ -263,7 +263,10 @@ function draw() {
   // sceneW uses the 2D formula so φ=0 scale matches the original 2D side view;
   // depth offset is rendered visually but does not shrink the auto-scale.
   const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
-  const autoS  = Math.min((W-margin*2)/sceneW, (H-margin*2)/sceneH);
+  // In 2D mode the canvas is split: left half = side view, right half = front view.
+  // Account for the 44*dpr left offset in OX so the side view stays within its half.
+  const sideW = params.show3D ? W - margin*2 : W/2 - margin - 44*dpr;
+  const autoS  = Math.min(sideW/sceneW, (H-margin*2)/sceneH);
   const S = autoS * viewScale;
   // Pivot rotation around the horizontal centre of the scene.
   // hcCenter0 is the projected horizontal coordinate of the centre at φ=0;
@@ -747,6 +750,167 @@ function draw() {
     const [sxBD,syBD]=p((g.Bw.x+g.Dw.x)/2,(g.Bw.y+g.Dw.y)/2);
     ctx.fillText('B→D '+FOLD_LEN+'m', sxBD+20*dpr, syBD-8*dpr);
   }
+
+  // ── 2D split: divider + front view ──
+  if (!params.show3D) {
+    ctx.strokeStyle='#3a4060'; ctx.lineWidth=1*dpr; ctx.setLineDash([6*dpr,4*dpr]);
+    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font=`${FS.room*dpr}px 'JetBrains Mono', monospace`; ctx.fillStyle='#5a5d6e';
+    ctx.textAlign='center';
+    ctx.fillText('側視圖', W*0.25, H-16*dpr);
+    drawFrontView(W, H, margin, dpr);
+  }
+}
+
+// ── 正面視圖 (front view, rendered in right half when 2D mode) ────────────────
+function drawFrontView(W, H, margin, dpr) {
+  const fvLeft   = W / 2;
+  const fvAvailW = W - fvLeft - margin;
+  const fvAvailH = H - margin * 2;
+
+  const boardH_m = params.showFold ? BOARD_LEN : MAIN_LEN;
+  // Extra padding so dim lines / labels have breathing room
+  const fvS = Math.min(fvAvailW / (BOARD_W + 0.6), fvAvailH / (boardH_m + 0.5));
+
+  const bW_px = BOARD_W * fvS;
+  const bH_px = boardH_m * fvS;
+
+  const fvOX = fvLeft + (fvAvailW - bW_px) / 2;
+  // Align board top (A) with side view content top: A is at canvas Y = margin + viewOY
+  const fvOY = margin + viewOY + bH_px;
+
+  const uMin = params.showFold ? 0 : FOLD_LEN;
+  const fv = (z, u) => [fvOX + z * fvS, fvOY - (u - uMin) * fvS];
+
+  // Orthographic front view: fold section is foreshortened by cos(foldRad).
+  // D apparent u = FOLD_LEN*(1 - cos(foldRad)); can exceed FOLD_LEN when foldRad > π/2.
+  const foldRad = (2 * Math.PI / 3) * (1 - params.angle / 40);
+  const cosFold = Math.cos(foldRad);
+  const D_u = FOLD_LEN * (1 - cosFold);
+
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt'; ctx.setLineDash([]);
+
+  // ── Main board section ──
+  ctx.fillStyle   = 'rgba(196,137,74,0.28)';
+  ctx.strokeStyle = '#c4894a'; ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(...fv(0,      FOLD_LEN));
+  ctx.lineTo(...fv(BOARD_W, FOLD_LEN));
+  ctx.lineTo(...fv(BOARD_W, BOARD_LEN));
+  ctx.lineTo(...fv(0,      BOARD_LEN));
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── Fold section ──
+  if (params.showFold) {
+    ctx.fillStyle   = 'rgba(122,184,232,0.22)';
+    ctx.strokeStyle = '#7ab8e8'; ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(...fv(0,       D_u));
+    ctx.lineTo(...fv(BOARD_W, D_u));
+    ctx.lineTo(...fv(BOARD_W, FOLD_LEN));
+    ctx.lineTo(...fv(0,       FOLD_LEN));
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+
+  // ── Screw holes & grid cells ──
+  if (params.showScrewHoles) {
+    const rPx = Math.max(HOLE_R_M * fvS, 1.5 * dpr);
+    ctx.fillStyle = 'rgba(255,255,255,0.80)';
+    SCREW_U.filter(u => u >= FOLD_LEN).forEach(u => SCREW_Z.forEach(z => {
+      const [cx,cy] = fv(z, u); ctx.beginPath(); ctx.arc(cx,cy,rPx,0,Math.PI*2); ctx.fill();
+    }));
+    CELL_U.filter(u => u >= FOLD_LEN).forEach(u => CELL_Z.forEach(z => {
+      const [cx,cy] = fv(z, u); ctx.beginPath(); ctx.arc(cx,cy,rPx,0,Math.PI*2); ctx.fill();
+    }));
+    if (params.showFold) {
+      // Holes on fold section foreshortened: au = FOLD_LEN + (u - FOLD_LEN)*cosFold
+      SCREW_U.filter(u => u < FOLD_LEN).forEach(u => SCREW_Z.forEach(z => {
+        const au = FOLD_LEN + (u - FOLD_LEN) * cosFold;
+        const [cx,cy] = fv(z, au); ctx.beginPath(); ctx.arc(cx,cy,rPx,0,Math.PI*2); ctx.fill();
+      }));
+      CELL_U.filter(u => u < FOLD_LEN).forEach(u => CELL_Z.forEach(z => {
+        const au = FOLD_LEN + (u - FOLD_LEN) * cosFold;
+        const [cx,cy] = fv(z, au); ctx.beginPath(); ctx.arc(cx,cy,rPx,0,Math.PI*2); ctx.fill();
+      }));
+    }
+  }
+
+  // ── Section labels ──
+  ctx.font = `${FS.seg*dpr}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center';
+  ctx.fillStyle = '#c4894a99';
+  { const [sx,sy] = fv(BOARD_W/2, (FOLD_LEN+BOARD_LEN)/2); ctx.fillText('A→B '+MAIN_LEN.toFixed(2)+'m', sx, sy); }
+  if (params.showFold) {
+    ctx.fillStyle = '#7ab8e899';
+    const [sx,sy] = fv(BOARD_W/2, (FOLD_LEN + D_u) / 2); ctx.fillText('B→D '+FOLD_LEN+'m', sx, sy);
+  }
+
+  // ── Point labels ──
+  ctx.font = `700 ${FS.label*dpr}px 'JetBrains Mono', monospace`; ctx.fillStyle = LABEL_RED;
+  { const [ax,ay] = fv(BOARD_W/2, BOARD_LEN); ctx.textAlign='center'; ctx.fillText('A', ax, ay-10*dpr); }
+  { const [bx,by] = fv(0, FOLD_LEN); ctx.textAlign='right'; ctx.fillText('B', bx-6*dpr, by+5*dpr); }
+  if (params.showFold) {
+    const [dx,dy] = fv(BOARD_W/2, D_u); ctx.textAlign='center'; ctx.fillText('D', dx, dy+16*dpr);
+  }
+
+  // ── Dimension lines ──
+  if (params.showDims) {
+    const fs     = FS.dim * dpr;
+    const dimOff = 28 * dpr;
+    ctx.font = `${fs}px 'JetBrains Mono', monospace`;
+
+    // Width below the board (uMin = bottom of view, always has space)
+    const [lx, botY] = fv(0,      uMin);
+    const [rx      ] = fv(BOARD_W, uMin);
+    fvDimH(lx, rx, botY + dimOff, BOARD_W.toFixed(2)+'m', dpr, fs);
+
+    // Main board height on right
+    const [rBx, rBy] = fv(BOARD_W, FOLD_LEN);
+    const [   , rAy] = fv(BOARD_W, BOARD_LEN);
+    fvDimV(rBx + dimOff, rAy, rBy, MAIN_LEN.toFixed(3)+'m', dpr, fs);
+
+    // Fold height on right — only when fold has visible extent (guard near-zero)
+    if (params.showFold && Math.abs(D_u - FOLD_LEN) > 0.02) {
+      const [   , rDy] = fv(BOARD_W, D_u);
+      fvDimV(rBx + dimOff*2, Math.min(rBy, rDy), Math.max(rBy, rDy), FOLD_LEN+'m', dpr, fs);
+    }
+  }
+
+  // ── Title ──
+  ctx.font = `${FS.room*dpr}px 'JetBrains Mono', monospace`; ctx.fillStyle = '#5a5d6e';
+  ctx.textAlign = 'center';
+  ctx.fillText('正面視圖', fvOX + bW_px/2, H - 16*dpr);
+}
+
+// Horizontal dimension line at canvas y=ly, spanning x1→x2
+function fvDimH(x1, x2, ly, label, dpr, fs) {
+  const off = 7*dpr, aw = 6*dpr;
+  ctx.strokeStyle = GRAY_DASH+'88'; ctx.fillStyle = GRAY_DASH;
+  ctx.lineWidth = 1*dpr; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x1,ly-off); ctx.lineTo(x1,ly+off); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2,ly-off); ctx.lineTo(x2,ly+off); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1,ly); ctx.lineTo(x2,ly); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1,ly); ctx.lineTo(x1+aw,ly-aw*0.4); ctx.lineTo(x1+aw,ly+aw*0.4); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x2,ly); ctx.lineTo(x2-aw,ly-aw*0.4); ctx.lineTo(x2-aw,ly+aw*0.4); ctx.closePath(); ctx.fill();
+  const mx=(x1+x2)/2, tw=ctx.measureText(label).width+8*dpr;
+  ctx.textAlign='center';
+  ctx.fillStyle='#0e0f12'; ctx.fillRect(mx-tw/2,ly-fs*0.85,tw,fs*1.3);
+  ctx.fillStyle=GRAY_DASH; ctx.fillText(label,mx,ly+fs*0.35);
+}
+
+// Vertical dimension line at canvas x=lx, from y1 (top) to y2 (bottom)
+function fvDimV(lx, y1, y2, label, dpr, fs) {
+  const off = 7*dpr, aw = 6*dpr;
+  ctx.strokeStyle = GRAY_DASH+'88'; ctx.fillStyle = GRAY_DASH;
+  ctx.lineWidth = 1*dpr; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(lx-off,y1); ctx.lineTo(lx+off,y1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx-off,y2); ctx.lineTo(lx+off,y2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx,y1); ctx.lineTo(lx,y2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx,y1); ctx.lineTo(lx-aw*0.4,y1+aw); ctx.lineTo(lx+aw*0.4,y1+aw); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(lx,y2); ctx.lineTo(lx-aw*0.4,y2-aw); ctx.lineTo(lx+aw*0.4,y2-aw); ctx.closePath(); ctx.fill();
+  const my=(y1+y2)/2, tw=ctx.measureText(label).width+8*dpr;
+  ctx.textAlign='center';
+  ctx.fillStyle='#0e0f12'; ctx.fillRect(lx-tw/2,my-fs*0.85,tw,fs*1.3);
+  ctx.fillStyle=GRAY_DASH; ctx.fillText(label,lx,my+fs*0.35);
 }
 
 // Draw a polygon face in 3D oblique projection.
