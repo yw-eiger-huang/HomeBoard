@@ -1,6 +1,7 @@
 import { canvas, params, view } from './state.js';
 import { clampAngle } from './geometry.js';
 import { draw } from './draw.js';
+// cache-bust: v2
 
 // ── Resize ────────────────────────────────────────────────────────────────────
 export function resize() {
@@ -48,6 +49,22 @@ hViewSlider.addEventListener('input', () => {
   draw();
 });
 
+const borderMarkWidthSlider = document.getElementById('borderMarkWidth');
+const borderMarkWidthValEl  = document.getElementById('borderMarkWidthVal');
+borderMarkWidthSlider.addEventListener('input', () => {
+  params.borderMarkWidth = parseFloat(borderMarkWidthSlider.value) / 100;
+  borderMarkWidthValEl.textContent = parseFloat(borderMarkWidthSlider.value).toFixed(1) + 'cm';
+  draw();
+});
+
+const borderMarkJunctionWidthSlider = document.getElementById('borderMarkJunctionWidth');
+const borderMarkJunctionWidthValEl  = document.getElementById('borderMarkJunctionWidthVal');
+borderMarkJunctionWidthSlider.addEventListener('input', () => {
+  params.borderMarkJunctionWidth = parseFloat(borderMarkJunctionWidthSlider.value) / 100;
+  borderMarkJunctionWidthValEl.textContent = parseFloat(borderMarkJunctionWidthSlider.value).toFixed(1) + 'cm';
+  draw();
+});
+
 let savedHViewAngle = params.hViewAngle;
 
 function setHViewAngle(deg) {
@@ -57,8 +74,8 @@ function setHViewAngle(deg) {
 }
 
 // ── Toggle buttons ────────────────────────────────────────────────────────────
-['tog3D','togDims','togFold','togQuarter','togScrewHoles'].forEach((id,i)=>{
-  const keys=['show3D','showDims','showFold','showQuarter','showScrewHoles'];
+['tog3D','togDims','togFold','togQuarter','togScrewHoles','togBorderMark'].forEach((id,i)=>{
+  const keys=['show3D','showDims','showFold','showQuarter','showScrewHoles','showBorderMark'];
   document.getElementById(id).addEventListener('click',function(){
     params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]);
     // hide/show hViewAngle row when toggling 3D; save/restore angle
@@ -66,6 +83,11 @@ function setHViewAngle(deg) {
       document.getElementById('hViewAngle').closest('.param-row').style.display = params.show3D ? '' : 'none';
       if(!params.show3D){ savedHViewAngle = params.hViewAngle; setHViewAngle(0); }
       else               { setHViewAngle(savedHViewAngle); }
+    }
+    if(id==='togBorderMark'){
+      const show = params.showBorderMark;
+      document.getElementById('borderMarkWidthRow').style.display         = show ? '' : 'none';
+      document.getElementById('borderMarkJunctionWidthRow').style.display = show ? '' : 'none';
     }
     draw();
   });

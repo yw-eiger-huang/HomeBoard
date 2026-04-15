@@ -49,6 +49,38 @@ export function drawFrontView(W, H, margin, dpr, S) {
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 
+  // ── Border marks: 5cm darker fill region on each board face ──
+  if (params.showBorderMark) {
+    const MARGIN = params.borderMarkWidth;
+    const MARG_J = params.borderMarkJunctionWidth;  // B-junction edge
+    const cos_r  = Math.cos(rad);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    // Main board: A-end uses MARGIN, B-junction uses MARG_J
+    const mT = AY_w - MARGIN*cos_r;
+    const mB = BY_w + MARG_J*cos_r;
+    ctx.beginPath();
+    ctx.moveTo(cvX(0),              cvY(AY_w)); ctx.lineTo(cvX(BOARD_W),        cvY(AY_w));
+    ctx.lineTo(cvX(BOARD_W),        cvY(BY_w)); ctx.lineTo(cvX(0),              cvY(BY_w));
+    ctx.closePath();
+    ctx.moveTo(cvX(MARGIN),         cvY(mT));   ctx.lineTo(cvX(BOARD_W-MARGIN), cvY(mT));
+    ctx.lineTo(cvX(BOARD_W-MARGIN), cvY(mB));   ctx.lineTo(cvX(MARGIN),         cvY(mB));
+    ctx.closePath();
+    ctx.fill('evenodd');
+    // Fold board: B-junction uses MARG_J, D-end uses MARGIN
+    if (params.showFold) {
+      const fT = BY_w + MARG_J*fdy;
+      const fB = DY_w - MARGIN*fdy;
+      ctx.beginPath();
+      ctx.moveTo(cvX(0),              cvY(BY_w)); ctx.lineTo(cvX(BOARD_W),        cvY(BY_w));
+      ctx.lineTo(cvX(BOARD_W),        cvY(DY_w)); ctx.lineTo(cvX(0),              cvY(DY_w));
+      ctx.closePath();
+      ctx.moveTo(cvX(MARGIN),         cvY(fT));   ctx.lineTo(cvX(BOARD_W-MARGIN), cvY(fT));
+      ctx.lineTo(cvX(BOARD_W-MARGIN), cvY(fB));   ctx.lineTo(cvX(MARGIN),         cvY(fB));
+      ctx.closePath();
+      ctx.fill('evenodd');
+    }
+  }
+
   // ── Screw holes & grid cells ──
   if (params.showScrewHoles) {
     const rPx = Math.max(HOLE_R_M * S, 1.5 * dpr);

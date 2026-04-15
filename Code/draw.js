@@ -260,6 +260,102 @@ export function draw() {
     }
   }
 
+  // ── Border marks: 5cm darker fill region on each board face ──
+  if (params.showBorderMark) {
+    const MARGIN  = params.borderMarkWidth;
+    const MARG_J  = params.borderMarkJunctionWidth;  // B-junction edge (main↔fold)
+    const bClr = 'rgba(0,0,0,0.35)';
+
+    if (params.show3D) {
+      // Signed-area helper to determine face winding (visibility)
+      const sAreaB = proj => {
+        let a=0;
+        for(let i=0;i<proj.length;i++){const[x1,y1]=proj[i],[x2,y2]=proj[(i+1)%proj.length];a+=x1*y2-x2*y1;}
+        return a;
+      };
+      // Draw frame region using evenodd fill; topMarg/botMarg = along-board margins at each end
+      const drawBoardBorder = (topPt, botPt, dx, dy, topMarg, botMarg) => {
+        const outer = [
+          [topPt.x, topPt.y, 0],
+          [topPt.x, topPt.y, BW],
+          [botPt.x, botPt.y, BW],
+          [botPt.x, botPt.y, 0],
+        ];
+        const inner = [
+          [topPt.x + topMarg*dx, topPt.y + topMarg*dy, MARGIN],
+          [topPt.x + topMarg*dx, topPt.y + topMarg*dy, BW-MARGIN],
+          [botPt.x - botMarg*dx, botPt.y - botMarg*dy, BW-MARGIN],
+          [botPt.x - botMarg*dx, botPt.y - botMarg*dy, MARGIN],
+        ];
+        ctx.fillStyle = bClr;
+        ctx.beginPath();
+        ctx.moveTo(...p(outer[0][0],outer[0][1],outer[0][2]));
+        outer.slice(1).forEach(q=>ctx.lineTo(...p(q[0],q[1],q[2])));
+        ctx.closePath();
+        ctx.moveTo(...p(inner[0][0],inner[0][1],inner[0][2]));
+        inner.slice(1).forEach(q=>ctx.lineTo(...p(q[0],q[1],q[2])));
+        ctx.closePath();
+        ctx.fill('evenodd');
+      };
+      // Main board: top=A-end (MARGIN), bot=B-junction (MARG_J)
+      const mainOF=[mb(g.Ao,0),mb(g.Bo,0),mb(g.Bo,BW),mb(g.Ao,BW)];
+      const mainIF=[mb(g.Aw,0),mb(g.Bw,0),mb(g.Bw,BW),mb(g.Aw,BW)];
+      const mainOuter = sAreaB(mainOF.map(pt=>p(pt.x,pt.y,pt.z))) < 0;
+      const mainFace  = mainOuter ? mainOF : mainIF;
+      const [mTop,mBot] = mainOuter ? [g.Ao,g.Bo] : [g.Aw,g.Bw];
+      drawList.push({ depth: faceDepth(mainFace) - 0.002,
+        drawFn: () => drawBoardBorder(mTop, mBot, g.ddx, g.ddy, MARGIN, MARG_J) });
+      // Fold board: top=B-junction (MARG_J), bot=D-end (MARGIN)
+      if (params.showFold) {
+        const foldOF=[mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)];
+        const foldIF=[mb(g.Bw,0),mb(g.Dw,0),mb(g.Dw,BW),mb(g.Bw,BW)];
+        const foldOuter = sAreaB(foldOF.map(pt=>p(pt.x,pt.y,pt.z))) < 0;
+        const foldFace  = foldOuter ? foldOF : foldIF;
+        const [fTop,fBot] = foldOuter ? [g.Bfo,g.Do] : [g.Bw,g.Dw];
+        drawList.push({ depth: faceDepth(foldFace) - 0.002,
+          drawFn: () => drawBoardBorder(fTop, fBot, g.fdx, g.fdy, MARG_J, MARGIN) });
+      }
+    } else {
+      // 2D side view: filled quads at each board end
+      drawList.push({ depth: 0, drawFn: () => {
+        ctx.fillStyle = bClr;
+        // A-end band (regular margin)
+        ctx.beginPath();
+        ctx.moveTo(...p(g.Aw.x,                    g.Aw.y));
+        ctx.lineTo(...p(g.Ao.x,                    g.Ao.y));
+        ctx.lineTo(...p(g.Ao.x+MARGIN*g.ddx,  g.Ao.y+MARGIN*g.ddy));
+        ctx.lineTo(...p(g.Aw.x+MARGIN*g.ddx,  g.Aw.y+MARGIN*g.ddy));
+        ctx.closePath(); ctx.fill();
+        // B-end band (junction margin)
+        ctx.beginPath();
+        ctx.moveTo(...p(g.Bw.x,                    g.Bw.y));
+        ctx.lineTo(...p(g.Bo.x,                    g.Bo.y));
+        ctx.lineTo(...p(g.Bo.x-MARG_J*g.ddx,  g.Bo.y-MARG_J*g.ddy));
+        ctx.lineTo(...p(g.Bw.x-MARG_J*g.ddx,  g.Bw.y-MARG_J*g.ddy));
+        ctx.closePath(); ctx.fill();
+      }});
+      if (params.showFold) {
+        drawList.push({ depth: 0, drawFn: () => {
+          ctx.fillStyle = bClr;
+          // B-fold-end band (junction margin)
+          ctx.beginPath();
+          ctx.moveTo(...p(g.Bw.x,                    g.Bw.y));
+          ctx.lineTo(...p(g.Bfo.x,                   g.Bfo.y));
+          ctx.lineTo(...p(g.Bfo.x+MARG_J*g.fdx, g.Bfo.y+MARG_J*g.fdy));
+          ctx.lineTo(...p(g.Bw.x+MARG_J*g.fdx,  g.Bw.y+MARG_J*g.fdy));
+          ctx.closePath(); ctx.fill();
+          // D-end band (regular margin)
+          ctx.beginPath();
+          ctx.moveTo(...p(g.Dw.x,                    g.Dw.y));
+          ctx.lineTo(...p(g.Do.x,                    g.Do.y));
+          ctx.lineTo(...p(g.Do.x-MARGIN*g.fdx,  g.Do.y-MARGIN*g.fdy));
+          ctx.lineTo(...p(g.Dw.x-MARGIN*g.fdx,  g.Dw.y-MARGIN*g.fdy));
+          ctx.closePath(); ctx.fill();
+        }});
+      }
+    }
+  }
+
   // Ghost C extension (dashed) — depth: front face of main board
   const ghostDepth = (ptDepth(g.Bw.x,0) + ptDepth(g.Cw.x,0)) / 2;
   drawList.push({ depth: ghostDepth, drawFn: () => {

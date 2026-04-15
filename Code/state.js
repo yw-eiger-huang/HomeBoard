@@ -4,7 +4,8 @@ export const ctx = canvas.getContext('2d');
 export const params = {
   angle: 40, inwardOffset: 1.0, gOffset: 1.80,
   hViewAngle: 0, show3D: true, showDims: true,
-  showFold: true, showQuarter: true, showScrewHoles: true
+  showFold: true, showQuarter: true, showScrewHoles: true,
+  showBorderMark: true, borderMarkWidth: 0.05, borderMarkJunctionWidth: 0.05
 };
 // gOffset range: 1.75 ~ 2.15 m
 
