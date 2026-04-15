@@ -78,16 +78,17 @@ function setHViewAngle(deg) {
   const keys=['show3D','showDims','showFold','showQuarter','showScrewHoles','showBorderMark'];
   document.getElementById(id).addEventListener('click',function(){
     params[keys[i]]=!params[keys[i]]; this.classList.toggle('on',params[keys[i]]);
-    // hide/show hViewAngle row when toggling 3D; save/restore angle
     if(id==='tog3D'){
-      document.getElementById('hViewAngle').closest('.param-row').style.display = params.show3D ? '' : 'none';
-      if(!params.show3D){ savedHViewAngle = params.hViewAngle; setHViewAngle(0); }
-      else               { setHViewAngle(savedHViewAngle); }
+      const off = !params.show3D;
+      document.getElementById('hViewAngle').closest('.param-row').classList.toggle('disabled', off);
+      document.getElementById('togScrewHoles').closest('.toggle-row').classList.toggle('disabled', off);
+      if(off){ savedHViewAngle = params.hViewAngle; setHViewAngle(0); }
+      else   { setHViewAngle(savedHViewAngle); }
     }
     if(id==='togBorderMark'){
-      const show = params.showBorderMark;
-      document.getElementById('borderMarkWidthRow').style.display         = show ? '' : 'none';
-      document.getElementById('borderMarkJunctionWidthRow').style.display = show ? '' : 'none';
+      const off = !params.showBorderMark;
+      document.getElementById('borderMarkWidthRow').classList.toggle('disabled', off);
+      document.getElementById('borderMarkJunctionWidthRow').classList.toggle('disabled', off);
     }
     draw();
   });

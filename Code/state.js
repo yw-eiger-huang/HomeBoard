@@ -3,7 +3,7 @@ export const ctx = canvas.getContext('2d');
 
 export const params = {
   angle: 40, inwardOffset: 1.0, gOffset: 1.80,
-  hViewAngle: 0, show3D: true, showDims: true,
+  hViewAngle: 0, show3D: false, showDims: true,
   showFold: true, showQuarter: true, showScrewHoles: true,
   showBorderMark: true, borderMarkWidth: 0.05, borderMarkJunctionWidth: 0.03
 };
