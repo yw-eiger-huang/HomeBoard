@@ -107,6 +107,40 @@ export function drawFrontView(W, H, margin, dpr, S) {
     }
   }
 
+  // ── Vertical division lines & width labels (main + fold panels) ──
+  {
+    const divLines = (widths, yTop, yBot, color) => {
+      const divZ = widths.slice(0,-1).reduce((acc,w) => [...acc, acc[acc.length-1]+w], [0]).slice(1);
+
+      // Border bands centered on each division line
+      if (params.showBorderMark) {
+        const halfW = params.borderMarkWidth * S / 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        for (const z of divZ) {
+          ctx.fillRect(cvX(z) - halfW, yTop, halfW * 2, yBot - yTop);
+        }
+      }
+
+      ctx.strokeStyle = color; ctx.lineWidth = 1*dpr;
+      ctx.setLineDash([5*dpr, 4*dpr]);
+      for (const z of divZ) {
+        ctx.beginPath(); ctx.moveTo(cvX(z), yTop); ctx.lineTo(cvX(z), yBot); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.font = `${FS.dim*dpr}px 'JetBrains Mono', monospace`;
+      ctx.fillStyle = color; ctx.textAlign = 'center';
+      let z0 = 0;
+      for (const w of widths) {
+        ctx.fillText(w.toFixed(2) + 'm', cvX(z0 + w/2), yTop + FS.dim*dpr + 6*dpr);
+        z0 += w;
+      }
+    };
+
+    divLines([0.58, 0.80, 0.90, 0.80, 0.58], cvY(AY_w), cvY(BY_w), 'rgba(196,137,74,0.45)');
+    if (params.showFold)
+      divLines([1.18, 1.30, 1.18], cvY(BY_w), cvY(DY_w), 'rgba(122,184,232,0.45)');
+  }
+
   // ── Section labels ──
   ctx.font = `${FS.seg*dpr}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center';
   ctx.fillStyle = '#c4894a99';
