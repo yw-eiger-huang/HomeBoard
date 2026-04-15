@@ -46,6 +46,10 @@ Hosted on **GitHub Pages** at:
 - To deploy changes: commit and push to `main` — GitHub Pages updates automatically within ~1 minute
 - **Deployment is only allowed from the `main` branch.** Never push to or deploy from any other branch.
 
+## Communication Style
+
+- **Work silently** until the task is fully complete. Do not narrate steps or provide progress updates mid-task. Only pause to prompt the user when a confirmation is genuinely required (e.g., before a destructive or irreversible action).
+
 ## Working Rules
 
 - **Do not commit or push** unless explicitly asked by the user.
