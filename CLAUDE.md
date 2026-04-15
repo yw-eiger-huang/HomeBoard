@@ -50,7 +50,8 @@ Hosted on **GitHub Pages** at:
 
 - **Do not commit or push** unless explicitly asked by the user.
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
-- **When updating the spec**, ask the user whether to create a new dated file or update the existing highest-dated file. (A hook blocks unauthorized branch switches with dirty working tree, new spec file creation, and commits that stage `Code/` without a `Spec/` file or a function spec without its design spec counterpart.)
+- **Never switch branches** when `Code/` has uncommitted changes. Commit or stash first.
+- **When updating the spec**, ask the user whether to create a new dated file or update the existing highest-dated file.
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
 - **When starting a new session**, read both the latest function spec (`Spec/YYYYMMDD.md`) and the latest design spec (`Spec/YYYYMMDD.design.md`) to understand the current state of the project. Do not rely on memory or prior context alone.
 - **When creating a new spec file**, write the content in a polished and compacted style: use `|·|` notation for distances, merge subsections that share the same structure, avoid repeating formulas already stated elsewhere (cross-reference instead), and remove verbose CSS/implementation detail in favor of concise prose or tables.
