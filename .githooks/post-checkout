@@ -1,0 +1,17 @@
+#!/bin/sh
+# Post-checkout hook: warn when switching branches with uncommitted Code/ changes.
+# Note: git has no pre-checkout hook, so this cannot block the switch —
+# it fires after the branch has already changed.
+#
+# $1 = previous HEAD, $2 = new HEAD, $3 = 1 if branch switch, 0 if file checkout
+
+[ "$3" = "1" ] || exit 0   # only act on branch switches
+
+dirty=$(git status --porcelain | grep -E '^ ?(M|A|D|R|C|U).*Code/')
+if [ -n "$dirty" ]; then
+  echo "post-checkout [warn]: switched branch with uncommitted Code/ changes:"
+  echo "$dirty" | sed 's/^/  /'
+  echo "  Remember to update the spec before committing."
+fi
+
+exit 0

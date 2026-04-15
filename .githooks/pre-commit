@@ -1,0 +1,52 @@
+#!/bin/sh
+# Pre-commit hook: enforce spec discipline
+#
+# R1 — Code/ changes must be accompanied by at least one Spec/ change.
+# R2 — A staged function spec (Spec/YYYYMMDD.md) must be paired with
+#       its design spec (Spec/YYYYMMDD.design.md) in the same commit.
+# R3 — A newly created spec file must be introduced together with its
+#       counterpart (fn+design always created as a pair).
+
+staged_code=$(git diff --cached --name-only | grep -E '^Code/')
+staged_spec=$(git diff --cached --name-only | grep -E '^Spec/')
+
+# ── R1 ────────────────────────────────────────────────────────────────────────
+if [ -n "$staged_code" ] && [ -z "$staged_spec" ]; then
+  echo "pre-commit [R1]: Code/ files staged without any Spec/ update."
+  echo "  Update the latest spec file before committing Code/ changes."
+  exit 1
+fi
+
+# ── R2 ────────────────────────────────────────────────────────────────────────
+staged_fn=$(git diff --cached --name-only | grep -E '^Spec/[0-9]+\.md$')
+
+for fn in $staged_fn; do
+  design="${fn%.md}.design.md"
+  if ! git diff --cached --name-only | grep -qF "$design"; then
+    echo "pre-commit [R2]: '$fn' staged without its design spec '$design'."
+    echo "  Stage both files together."
+    exit 1
+  fi
+done
+
+# ── R3 ────────────────────────────────────────────────────────────────────────
+new_fn=$(git diff --cached --name-only --diff-filter=A | grep -E '^Spec/[0-9]+\.md$')
+new_design=$(git diff --cached --name-only --diff-filter=A | grep -E '^Spec/[0-9]+\.design\.md$')
+
+for fn in $new_fn; do
+  design="${fn%.md}.design.md"
+  if ! echo "$new_design" | grep -qF "$design"; then
+    echo "pre-commit [R3]: new spec '$fn' requires new design spec '$design' in the same commit."
+    exit 1
+  fi
+done
+
+for design in $new_design; do
+  fn="${design%.design.md}.md"
+  if ! echo "$new_fn" | grep -qF "$fn"; then
+    echo "pre-commit [R3]: new design spec '$design' requires new function spec '$fn' in the same commit."
+    exit 1
+  fi
+done
+
+exit 0
