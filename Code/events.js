@@ -139,5 +139,11 @@ canvas.addEventListener('touchend',e=>{
   else if(e.touches.length===1){view.lastTouchDist=null;view.lastMX=e.touches[0].clientX;view.lastMY=e.touches[0].clientY;}
 },{passive:false});
 
+// ── Cutting plan modal ────────────────────────────────────────────────────────
+const cpModal = document.getElementById('cuttingPlanModal');
+document.getElementById('btnCuttingPlan').addEventListener('click', () => cpModal.classList.add('open'));
+document.getElementById('cpClose').addEventListener('click',       () => cpModal.classList.remove('open'));
+cpModal.addEventListener('click', e => { if (e.target === cpModal) cpModal.classList.remove('open'); });
+
 // ── Window resize ─────────────────────────────────────────────────────────────
 window.addEventListener('resize', resize);
