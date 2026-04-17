@@ -16,6 +16,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
   const BY_w = AY_w - MAIN_LEN * Math.cos(rad);             // B fold joint
   const fdy  = -Math.cos(rad + foldRad);                    // Y-component of fold direction
   const DY_w = BY_w + FOLD_LEN * fdy;                       // D fold end
+  const foldVisible = params.showFold && fdy < 0;           // hide fold when folded behind main board
 
   // Canvas coordinate functions — same scale and Y-origin as side view so A aligns.
   //   Side view: OY = margin + CEIL_H*S + viewOY  →  cvY(y) = OY - y*S
@@ -38,7 +39,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
   ctx.closePath(); ctx.fill(); ctx.stroke();
 
   // ── Fold section ──
-  if (params.showFold) {
+  if (foldVisible) {
     ctx.fillStyle   = 'rgba(122,184,232,0.22)';
     ctx.strokeStyle = '#7ab8e8'; ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath();
@@ -67,7 +68,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
     ctx.closePath();
     ctx.fill('evenodd');
     // Fold board: B-junction uses MARG_J, D-end uses MARGIN
-    if (params.showFold) {
+    if (foldVisible) {
       const fT = BY_w + MARG_J*fdy;
       const fB = DY_w - MARGIN*fdy;
       ctx.beginPath();
@@ -94,7 +95,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
       const hy = AY_w - (BOARD_LEN - u) * Math.cos(rad);
       CELL_Z.forEach(z => { ctx.beginPath(); ctx.arc(cvX(z), cvY(hy), rPx, 0, Math.PI*2); ctx.fill(); });
     });
-    if (params.showFold) {
+    if (foldVisible) {
       // Fold: hole at u maps to y = BY_w + (FOLD_LEN - u)*fdy  (u=0 at D, u=FOLD_LEN at B)
       SCREW_U.filter(u => u < FOLD_LEN).forEach(u => {
         const hy = BY_w + (FOLD_LEN - u) * fdy;
@@ -136,8 +137,8 @@ export function drawFrontView(W, H, margin, dpr, S) {
       }
     };
 
-    divLines([0.58, 0.80, 0.90, 0.80, 0.58], cvY(AY_w), cvY(BY_w), 'rgba(196,137,74,0.45)');
-    if (params.showFold)
+    divLines([0.48, 0.90, 0.90, 0.90, 0.48], cvY(AY_w), cvY(BY_w), 'rgba(196,137,74,0.45)');
+    if (foldVisible)
       divLines([1.18, 1.30, 1.18], cvY(BY_w), cvY(DY_w), 'rgba(122,184,232,0.45)');
   }
 
@@ -145,7 +146,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
   ctx.font = `${FS.seg*dpr}px 'JetBrains Mono', monospace`; ctx.textAlign = 'center';
   ctx.fillStyle = '#c4894a99';
   ctx.fillText('A→B ' + MAIN_LEN.toFixed(2) + 'm', cvX(BOARD_W/2), (cvY(AY_w) + cvY(BY_w)) / 2);
-  if (params.showFold) {
+  if (foldVisible) {
     ctx.fillStyle = '#7ab8e899';
     ctx.fillText('B→D ' + FOLD_LEN + 'm', cvX(BOARD_W/2), (cvY(BY_w) + cvY(DY_w)) / 2);
   }
@@ -154,7 +155,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
   ctx.font = `700 ${FS.label*dpr}px 'JetBrains Mono', monospace`; ctx.fillStyle = LABEL_RED;
   ctx.textAlign = 'center'; ctx.fillText('A', cvX(BOARD_W/2), cvY(AY_w) - 10*dpr);
   ctx.textAlign = 'right';  ctx.fillText('B', cvX(0) - 6*dpr,  cvY(BY_w) + 5*dpr);
-  if (params.showFold) {
+  if (foldVisible) {
     ctx.textAlign = 'center'; ctx.fillText('D', cvX(BOARD_W/2), cvY(DY_w) + 16*dpr);
   }
 
@@ -165,7 +166,7 @@ export function drawFrontView(W, H, margin, dpr, S) {
     ctx.font = `${fs}px 'JetBrains Mono', monospace`;
 
     // Width below the lowest board edge
-    const lowestY  = params.showFold ? Math.min(BY_w, DY_w) : BY_w;
+    const lowestY  = foldVisible ? Math.min(BY_w, DY_w) : BY_w;
     fvDimH(cvX(0), cvX(BOARD_W), cvY(lowestY) + dimOff, BOARD_W.toFixed(2) + 'm', dpr, fs);
 
     // Main board height on right (label shows actual length MAIN_LEN)

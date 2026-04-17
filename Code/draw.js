@@ -158,8 +158,9 @@ export function draw() {
       addFace([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
         'rgba(50,90,130,0.40)','#325a82',lw3);
     }
-    addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Do,0),mb(g.Bfo,0)],
-      'rgba(122,184,232,0.22)','#7ab8e8',1.5*dpr);
+    if(params.show3D || g.fdy < 0)
+      addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Do,0),mb(g.Bfo,0)],
+        'rgba(122,184,232,0.22)','#7ab8e8',1.5*dpr);
   }
 
   // depth of a single 3D point
@@ -465,7 +466,7 @@ export function draw() {
   drawKeyPt(...p(g.Aw.x,g.Aw.y), '#e8c87a','A', 16,-16,dpr);
   drawKeyPt(...p(g.Bw.x,g.Bw.y), '#7ab8e8','B', 16,  4,dpr);
   drawKeyPt(...p(g.Cw.x,g.Cw.y), '#e87a7a','C', 16,  4,dpr);
-  if(params.showFold)
+  if(params.showFold && (params.show3D || g.fdy < 0))
     drawKeyPt(...p(g.Dw.x,g.Dw.y),'#b07ae8','D', 16,  4,dpr);
 
   // ── Dimension lines ──
@@ -603,7 +604,7 @@ export function draw() {
   ctx.fillStyle='#c4894a99';
   const [sxAB,syAB]=p((g.Ac.x+g.Bc.x)/2,(g.Ac.y+g.Bc.y)/2);
   ctx.fillText('A→B '+MAIN_LEN.toFixed(2)+'m', sxAB+20*dpr, syAB-8*dpr);
-  if(params.showFold){
+  if(params.showFold && (params.show3D || g.fdy < 0)){
     ctx.fillStyle='#7ab8e899';
     const [sxBD,syBD]=p((g.Bw.x+g.Dw.x)/2,(g.Bw.y+g.Dw.y)/2);
     ctx.fillText('B→D '+FOLD_LEN+'m', sxBD+20*dpr, syBD-8*dpr);
