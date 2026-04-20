@@ -7,7 +7,7 @@ import { ctx, params, view } from './state.js';
 // Uses the same scale S as the side view so both views share the same pixels-per-metre.
 export function drawFrontView(W, H, margin, dpr, S) {
   const rad     = params.angle * Math.PI / 180;
-  const foldRad = (2 * Math.PI / 3) * (1 - params.angle / 40);
+  const foldRad = Math.PI * (1 - params.angle / 40);
 
   // World-space Y of key edges (front view projects 3-D points onto Y-Z plane)
   //   Board wall-side direction: (ddx, ddy) = (-sin(θ), -cos(θ))
