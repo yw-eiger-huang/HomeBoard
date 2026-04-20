@@ -1,4 +1,4 @@
-import { MAIN_LEN, BOARD_LEN, FOLD_LEN, AX_W, AY, HX, HY, T, HT } from './constants.js';
+import { MAIN_LEN, BOARD_LEN, FOLD_LEN, AX_W, AY, HX, HY, T_FRAME, HT } from './constants.js';
 import { params } from './state.js';
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
@@ -34,9 +34,9 @@ export function getGeom() {
   const Cw = { x: AX_W + BOARD_LEN * ddx,    y: AY + BOARD_LEN * ddy };
 
   // Outer edge key points (main board)
-  const Ao = { x: Aw.x + T * mnx, y: Aw.y + T * mny };
-  const Bo = { x: Bw.x + T * mnx, y: Bw.y + T * mny };
-  const Co = { x: Cw.x + T * mnx, y: Cw.y + T * mny };
+  const Ao = { x: Aw.x + T_FRAME * mnx, y: Aw.y + T_FRAME * mny };
+  const Bo = { x: Bw.x + T_FRAME * mnx, y: Bw.y + T_FRAME * mny };
+  const Co = { x: Cw.x + T_FRAME * mnx, y: Cw.y + T_FRAME * mny };
 
   // Center line points
   const Ac = { x: Aw.x + HT * mnx, y: Aw.y + HT * mny };
@@ -59,9 +59,9 @@ export function getGeom() {
   // So this is always correct (same convention as board).
 
   const Dw = { x: Bw.x + FOLD_LEN * fdx,         y: Bw.y + FOLD_LEN * fdy };
-  const Do = { x: Dw.x + T * fnx,                 y: Dw.y + T * fny };
+  const Do = { x: Dw.x + T_FRAME * fnx,                 y: Dw.y + T_FRAME * fny };
   // B outer for fold = B_w + T*(fnx,fny) — same as Bo when foldAngle=0
-  const Bfo = { x: Bw.x + T * fnx, y: Bw.y + T * fny };
+  const Bfo = { x: Bw.x + T_FRAME * fnx, y: Bw.y + T_FRAME * fny };
 
   // G point: user-controlled distance from A along board wall-side edge
   const GX = Aw.x + params.gOffset * ddx;

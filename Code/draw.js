@@ -1,4 +1,4 @@
-import { BOARD_LEN, FOLD_LEN, MAIN_LEN, CEIL_H, T, BOARD_W, HOLE_R_M, SCREW_Z, SCREW_U, CELL_Z, CELL_U, LABEL_RED, GRAY_DASH, FS, AX_W, AY, HX, HY, REF_IX, REF_IY } from './constants.js';
+import { BOARD_LEN, FOLD_LEN, MAIN_LEN, CEIL_H, T, T_FRAME, BOARD_W, HOLE_R_M, SCREW_Z, SCREW_U, CELL_Z, CELL_U, LABEL_RED, GRAY_DASH, FS, AX_W, AY, HX, HY, REF_IX, REF_IY, MAIN_DIV_WIDTHS, FOLD_DIV_WIDTHS } from './constants.js';
 import { canvas, ctx, params, view } from './state.js';
 import { getGeom } from './geometry.js';
 import { drawFrontView } from './frontview.js';
@@ -18,7 +18,7 @@ export function draw() {
   const sinV = Math.sin(params.hViewAngle * Math.PI / 180);
   // sceneW uses the 2D formula so φ=0 scale matches the original 2D side view;
   // depth offset is rendered visually but does not shrink the auto-scale.
-  const sceneW = AX_W + T + 0.5, sceneH = CEIL_H * 1.22;
+  const sceneW = AX_W + T_FRAME + 0.5, sceneH = CEIL_H * 1.22;
   // In 2D mode the canvas is split: left half = side view, right half = front view.
   // Account for the 44*dpr left offset in OX so the side view stays within its half.
   const sideW  = params.show3D ? W - margin*2 : W/2 - margin - 44*dpr;
@@ -35,7 +35,7 @@ export function draw() {
   // hcCenter is that same coordinate at the current angle.
   // Keeping OX such that (OX + hcCenter·S) is constant makes the scene
   // rotate in-place rather than drifting left/right.
-  const cx = (AX_W+T+0.5)/2, cz = BOARD_W/2;
+  const cx = (AX_W+T_FRAME+0.5)/2, cz = BOARD_W/2;
   const hcCenter0 = cx + cz*OBL_COS;
   const hcCenter  = (cx*cosV + cz*sinV) + (-cx*sinV + cz*cosV)*OBL_COS;
   const OX = margin + view.OX + 44*dpr + (hcCenter0 - hcCenter)*S;
@@ -318,6 +318,19 @@ export function draw() {
       const [mTop,mBot] = mainOuter ? [g.Ao,g.Bo] : [g.Aw,g.Bw];
       drawList.push({ depth: faceDepth(mainFace) - 0.002,
         drawFn: () => drawBoardBorder(mTop, mBot, g.ddx, g.ddy, MARGIN, MARG_J) });
+      // Main board division bands
+      const mainDivZ = MAIN_DIV_WIDTHS.slice(0,-1).reduce((a,w)=>[...a,a[a.length-1]+w],[0]).slice(1);
+      const mainDepth = faceDepth(mainFace) - 0.002;
+      for (const zd of mainDivZ) {
+        const z0=zd-MARGIN/2, z1=zd+MARGIN/2;
+        drawList.push({ depth: mainDepth, drawFn: () => {
+          ctx.fillStyle=bClr;
+          ctx.beginPath();
+          ctx.moveTo(...p(mTop.x,mTop.y,z0)); ctx.lineTo(...p(mTop.x,mTop.y,z1));
+          ctx.lineTo(...p(mBot.x,mBot.y,z1)); ctx.lineTo(...p(mBot.x,mBot.y,z0));
+          ctx.closePath(); ctx.fill();
+        }});
+      }
       // Fold board: top=B-junction (MARG_J), bot=D-end (MARGIN)
       if (params.showFold) {
         const foldOF=[mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)];
@@ -327,6 +340,19 @@ export function draw() {
         const [fTop,fBot] = foldOuter ? [g.Bfo,g.Do] : [g.Bw,g.Dw];
         drawList.push({ depth: faceDepth(foldFace) - 0.002,
           drawFn: () => drawBoardBorder(fTop, fBot, g.fdx, g.fdy, MARG_J, MARGIN) });
+        // Fold board division bands
+        const foldDivZ = FOLD_DIV_WIDTHS.slice(0,-1).reduce((a,w)=>[...a,a[a.length-1]+w],[0]).slice(1);
+        const foldDepth = faceDepth(foldFace) - 0.002;
+        for (const zd of foldDivZ) {
+          const z0=zd-MARGIN/2, z1=zd+MARGIN/2;
+          drawList.push({ depth: foldDepth, drawFn: () => {
+            ctx.fillStyle=bClr;
+            ctx.beginPath();
+            ctx.moveTo(...p(fTop.x,fTop.y,z0)); ctx.lineTo(...p(fTop.x,fTop.y,z1));
+            ctx.lineTo(...p(fBot.x,fBot.y,z1)); ctx.lineTo(...p(fBot.x,fBot.y,z0));
+            ctx.closePath(); ctx.fill();
+          }});
+        }
       }
     } else {
       // 2D side view: filled quads at each board end
@@ -379,6 +405,34 @@ export function draw() {
     ctx.beginPath();ctx.moveTo(...p(g.Bo.x,g.Bo.y));ctx.lineTo(...p(g.Co.x,g.Co.y));ctx.stroke();
     ctx.setLineDash([]);
   }});
+
+  // ── Panel-face boundary line: panel (T) on outer face, frame (T_FRAME−T) on inner/back ──
+  if (params.showDims) {
+    const pnx = -g.ddy, pny = g.ddx; // main board outward normal
+    const TF = T_FRAME - T; // frame-only depth (2.7cm)
+    const Apx = g.Aw.x + TF*pnx, Apy = g.Aw.y + TF*pny; // panel-frame boundary (1.8cm from outer)
+    const Bpx = g.Bw.x + TF*pnx, Bpy = g.Bw.y + TF*pny;
+    drawList.push({ depth: (ptDepth(g.Aw.x,0)+ptDepth(g.Bw.x,0))/2 - 0.001, drawFn: () => {
+      ctx.strokeStyle=GRAY_DASH+'55'; ctx.lineWidth=1*dpr; ctx.setLineDash([3*dpr,3*dpr]);
+      ctx.beginPath(); ctx.moveTo(...p(Apx,Apy,0)); ctx.lineTo(...p(Bpx,Bpy,0)); ctx.stroke();
+      if (params.show3D) {
+        ctx.beginPath(); ctx.moveTo(...p(Apx,Apy,BW)); ctx.lineTo(...p(Bpx,Bpy,BW)); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }});
+    if (params.showFold) {
+      const Bfpx = g.Bw.x + TF*g.fnx, Bfpy = g.Bw.y + TF*g.fny;
+      const Dpx  = g.Dw.x + TF*g.fnx, Dpy  = g.Dw.y + TF*g.fny;
+      drawList.push({ depth: (ptDepth(g.Bw.x,0)+ptDepth(g.Dw.x,0))/2 - 0.001, drawFn: () => {
+        ctx.strokeStyle=GRAY_DASH+'55'; ctx.lineWidth=1*dpr; ctx.setLineDash([3*dpr,3*dpr]);
+        ctx.beginPath(); ctx.moveTo(...p(Bfpx,Bfpy,0)); ctx.lineTo(...p(Dpx,Dpy,0)); ctx.stroke();
+        if (params.show3D) {
+          ctx.beginPath(); ctx.moveTo(...p(Bfpx,Bfpy,BW)); ctx.lineTo(...p(Dpx,Dpy,BW)); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }});
+    }
+  }
 
   // ── H→G dashed distance ──
   if(params.showQuarter){
@@ -589,14 +643,20 @@ export function draw() {
     ctx.fillStyle='#e8c87a'; ctx.textAlign='center';
     ctx.fillText(params.angle+'°', ax+Math.cos(midA)*(arcR+16*dpr), ay+Math.sin(midA)*(arcR+16*dpr));
 
-    // Thickness annotation at B
-    ctx.strokeStyle=GRAY_DASH+'44'; ctx.lineWidth=1*dpr;
-    ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Bo.x,g.Bo.y));ctx.stroke();
+    // Thickness annotation at B: frame (inner/back, T_FRAME−T) + panel (outer/front, T)
+    const mnx=-g.ddy, mny=g.ddx;
     const [tbwx,tbwy]=p(g.Bw.x,g.Bw.y), [tbox,tboy]=p(g.Bo.x,g.Bo.y);
-    const tmx=(tbwx+tbox)/2, tmy=(tbwy+tboy)/2;
+    const [tbpx,tbpy]=p(g.Bw.x+(T_FRAME-T)*mnx, g.Bw.y+(T_FRAME-T)*mny);  // panel-frame boundary
     ctx.font=`${(FS.dim-1)*dpr}px 'JetBrains Mono', monospace`;
     ctx.fillStyle=GRAY_DASH+'88'; ctx.textAlign='left';
-    ctx.fillText('5cm', tmx+8*dpr, tmy+4*dpr);
+    // full assembly line (total depth)
+    ctx.strokeStyle=GRAY_DASH+'44'; ctx.lineWidth=1*dpr;
+    ctx.beginPath();ctx.moveTo(tbwx,tbwy);ctx.lineTo(tbox,tboy);ctx.stroke();
+    // panel region tick (boundary → outer face, shows 1.8cm panel layer)
+    ctx.beginPath();ctx.moveTo(tbpx,tbpy);ctx.lineTo(tbox,tboy);ctx.stroke();
+    // labels: frame region near inner face, panel region near outer face
+    ctx.fillText('框 '+((T_FRAME-T)*100).toFixed(1)+'cm', tbwx+8*dpr, tbwy+4*dpr);
+    ctx.fillText('板 '+(T*100).toFixed(1)+'cm',           tbox+8*dpr, tboy+4*dpr);
   }
 
   // Room labels

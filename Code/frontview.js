@@ -1,4 +1,4 @@
-import { CEIL_H, MAIN_LEN, FOLD_LEN, BOARD_LEN, BOARD_W, SCREW_U, SCREW_Z, CELL_U, CELL_Z, HOLE_R_M, GRAY_DASH, FS, LABEL_RED } from './constants.js';
+import { CEIL_H, MAIN_LEN, FOLD_LEN, BOARD_LEN, BOARD_W, SCREW_U, SCREW_Z, CELL_U, CELL_Z, HOLE_R_M, GRAY_DASH, FS, LABEL_RED, MAIN_DIV_WIDTHS, FOLD_DIV_WIDTHS } from './constants.js';
 import { ctx, params, view } from './state.js';
 
 // ── 正面視圖 (front view, rendered in right half when 2D mode) ────────────────
@@ -137,9 +137,9 @@ export function drawFrontView(W, H, margin, dpr, S) {
       }
     };
 
-    divLines([0.48, 0.90, 0.90, 0.90, 0.48], cvY(AY_w), cvY(BY_w), 'rgba(196,137,74,0.45)');
+    divLines(MAIN_DIV_WIDTHS, cvY(AY_w), cvY(BY_w), 'rgba(196,137,74,0.45)');
     if (foldVisible)
-      divLines([1.18, 1.30, 1.18], cvY(BY_w), cvY(DY_w), 'rgba(122,184,232,0.45)');
+      divLines(FOLD_DIV_WIDTHS, cvY(BY_w), cvY(DY_w), 'rgba(122,184,232,0.45)');
   }
 
   // ── Section labels ──
