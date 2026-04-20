@@ -46,8 +46,8 @@ export function getGeom() {
   const boardDir = Math.atan2(ddy, ddx);
 
   // Fold: rigid rectangle around B_w — synced with wall angle, folds toward inner side (wall)
-  // foldRad: 2π/3 (120°) at angle=0 → 0 at angle=40 (straight, D=C)
-  const foldRad = (2 * Math.PI / 3) * (1 - params.angle / 40);
+  // foldRad: π (180°) at angle=0 → 0 at angle=40 (straight, D=C)
+  const foldRad = Math.PI * (1 - params.angle / 40);
   const foldDir = boardDir - foldRad;
   const fdx = Math.cos(foldDir), fdy = Math.sin(foldDir);
 

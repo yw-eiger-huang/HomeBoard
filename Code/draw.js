@@ -109,6 +109,19 @@ export function draw() {
     ctx.setLineDash([4*dpr,4*dpr]);
     ctx.beginPath(); ctx.moveTo(...p(0,0,0)); ctx.lineTo(...p(0,CEIL_H,0)); ctx.stroke();
     ctx.setLineDash([]);
+  } else {
+    // 2D side view: wall (x=0) and ceiling (y=CEIL_H) as filled strips + outlines
+    const [wx0, wy0] = p(0, 0);
+    const [wx1, wy1] = p(0, CEIL_H);
+    const [cx1, cy1] = p(roomMaxX, CEIL_H);
+    const strip = 8 * dpr;
+    ctx.fillStyle = '#2d3548';
+    ctx.fillRect(wx0 - strip, wy1, strip, wy0 - wy1);       // wall strip
+    ctx.fillStyle = '#2a2e40';
+    ctx.fillRect(wx1 - strip, wy1 - strip, cx1 - wx1 + strip, strip); // ceiling strip
+    ctx.strokeStyle = '#4a5070'; ctx.lineWidth = 1.5 * dpr; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(wx0, wy0); ctx.lineTo(wx1, wy1); ctx.stroke(); // wall line
+    ctx.beginPath(); ctx.moveTo(wx1, wy1); ctx.lineTo(cx1, cy1); ctx.stroke(); // ceiling line
   }
 
   // Floor front edge (always shown)
@@ -158,9 +171,8 @@ export function draw() {
       addFace([mb(g.Dw,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Dw,BW)],
         'rgba(50,90,130,0.40)','#325a82',lw3);
     }
-    if(params.show3D || g.fdy < 0)
-      addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Do,0),mb(g.Bfo,0)],
-        'rgba(122,184,232,0.22)','#7ab8e8',1.5*dpr);
+    addFace([mb(g.Bw,0),mb(g.Dw,0),mb(g.Do,0),mb(g.Bfo,0)],
+      'rgba(122,184,232,0.22)','#7ab8e8',1.5*dpr);
   }
 
   // depth of a single 3D point
@@ -466,7 +478,7 @@ export function draw() {
   drawKeyPt(...p(g.Aw.x,g.Aw.y), '#e8c87a','A', 16,-16,dpr);
   drawKeyPt(...p(g.Bw.x,g.Bw.y), '#7ab8e8','B', 16,  4,dpr);
   drawKeyPt(...p(g.Cw.x,g.Cw.y), '#e87a7a','C', 16,  4,dpr);
-  if(params.showFold && (params.show3D || g.fdy < 0))
+  if(params.showFold)
     drawKeyPt(...p(g.Dw.x,g.Dw.y),'#b07ae8','D', 16,  4,dpr);
 
   // ── Dimension lines ──
@@ -595,6 +607,14 @@ export function draw() {
     ctx.fillText('牆面',  rlwx+4*dpr, rlwy);
     const [rlcx,rlcy]=p(0.04,CEIL_H,BW*0.5);
     ctx.fillText('天花板',rlcx, rlcy-6*dpr);
+  } else {
+    const [rlwx,rlwy]=p(0,CEIL_H*0.5);
+    ctx.textAlign='right';
+    ctx.fillText('牆面', rlwx-10*dpr, rlwy);
+    const [rlcx,rlcy]=p(roomMaxX*0.5,CEIL_H);
+    ctx.textAlign='center';
+    ctx.fillText('天花板', rlcx, rlcy-12*dpr);
+    ctx.textAlign='left';
   }
   const [rlfx,rlfy]=p(0.04,-0.04);
   ctx.fillText('地面',  rlfx, rlfy+14*dpr);
@@ -604,7 +624,7 @@ export function draw() {
   ctx.fillStyle='#c4894a99';
   const [sxAB,syAB]=p((g.Ac.x+g.Bc.x)/2,(g.Ac.y+g.Bc.y)/2);
   ctx.fillText('A→B '+MAIN_LEN.toFixed(2)+'m', sxAB+20*dpr, syAB-8*dpr);
-  if(params.showFold && (params.show3D || g.fdy < 0)){
+  if(params.showFold){
     ctx.fillStyle='#7ab8e899';
     const [sxBD,syBD]=p((g.Bw.x+g.Dw.x)/2,(g.Bw.y+g.Dw.y)/2);
     ctx.fillText('B→D '+FOLD_LEN+'m', sxBD+20*dpr, syBD-8*dpr);
