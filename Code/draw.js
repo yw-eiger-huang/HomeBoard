@@ -331,6 +331,24 @@ export function draw() {
           ctx.closePath(); ctx.fill();
         }});
       }
+      // Mid-frame: horizontal cross-member at main board midpoint, on backside
+      {
+        const frameH = MARGIN;
+        const nominal = (FOLD_LEN + BOARD_LEN) / 2;
+        const allHoles = [...SCREW_U.filter(u=>u>=FOLD_LEN),...CELL_U.filter(u=>u>=FOLD_LEN)];
+        let u_f = nominal;
+        while (allHoles.some(hu=>Math.abs(hu-u_f)<frameH/2+HOLE_R_M) && u_f<BOARD_LEN-frameH) u_f+=0.005;
+        const dist = BOARD_LEN - u_f;
+        const P1 = {x:mTop.x+(dist-frameH/2)*g.ddx, y:mTop.y+(dist-frameH/2)*g.ddy};
+        const P2 = {x:mTop.x+(dist+frameH/2)*g.ddx, y:mTop.y+(dist+frameH/2)*g.ddy};
+        drawList.push({ depth: mainDepth, drawFn: () => {
+          ctx.fillStyle=bClr;
+          ctx.beginPath();
+          ctx.moveTo(...p(P1.x,P1.y,0)); ctx.lineTo(...p(P1.x,P1.y,BW));
+          ctx.lineTo(...p(P2.x,P2.y,BW)); ctx.lineTo(...p(P2.x,P2.y,0));
+          ctx.closePath(); ctx.fill();
+        }});
+      }
       // Fold board: top=B-junction (MARG_J), bot=D-end (MARGIN)
       if (params.showFold) {
         const foldOF=[mb(g.Bfo,0),mb(g.Do,0),mb(g.Do,BW),mb(g.Bfo,BW)];
@@ -373,6 +391,24 @@ export function draw() {
         ctx.lineTo(...p(g.Bw.x-MARG_J*g.ddx,  g.Bw.y-MARG_J*g.ddy));
         ctx.closePath(); ctx.fill();
       }});
+      // Mid-frame: horizontal cross-member at main board midpoint, on backside
+      {
+        const frameH = MARGIN;
+        const nominal = (FOLD_LEN + BOARD_LEN) / 2;
+        const allHoles = [...SCREW_U.filter(u=>u>=FOLD_LEN),...CELL_U.filter(u=>u>=FOLD_LEN)];
+        let u_f = nominal;
+        while (allHoles.some(hu=>Math.abs(hu-u_f)<frameH/2+HOLE_R_M) && u_f<BOARD_LEN-frameH) u_f+=0.005;
+        const dist = BOARD_LEN - u_f;
+        drawList.push({ depth: 0, drawFn: () => {
+          ctx.fillStyle = bClr;
+          ctx.beginPath();
+          ctx.moveTo(...p(g.Aw.x+(dist-frameH/2)*g.ddx, g.Aw.y+(dist-frameH/2)*g.ddy));
+          ctx.lineTo(...p(g.Ao.x+(dist-frameH/2)*g.ddx, g.Ao.y+(dist-frameH/2)*g.ddy));
+          ctx.lineTo(...p(g.Ao.x+(dist+frameH/2)*g.ddx, g.Ao.y+(dist+frameH/2)*g.ddy));
+          ctx.lineTo(...p(g.Aw.x+(dist+frameH/2)*g.ddx, g.Aw.y+(dist+frameH/2)*g.ddy));
+          ctx.closePath(); ctx.fill();
+        }});
+      }
       if (params.showFold) {
         drawList.push({ depth: 0, drawFn: () => {
           ctx.fillStyle = bClr;

@@ -18,6 +18,14 @@ export function drawFrontView(W, H, margin, dpr, S) {
   const DY_w = BY_w + FOLD_LEN * fdy;                       // D fold end
   const foldVisible = params.showFold && fdy < 0;           // hide fold when folded behind main board
 
+  // Mid-frame position (computed once; used by border-mark draw + dim annotation)
+  const mfFrameH = params.borderMarkWidth;
+  { const nom = (FOLD_LEN + BOARD_LEN) / 2;
+    const holes = [...SCREW_U.filter(u=>u>=FOLD_LEN),...CELL_U.filter(u=>u>=FOLD_LEN)];
+    var mfU = nom;
+    while (holes.some(hu=>Math.abs(hu-mfU)<mfFrameH/2+HOLE_R_M) && mfU<BOARD_LEN-mfFrameH) mfU+=0.005; }
+  const mfDist = BOARD_LEN - mfU;   // distance from A to frame centre along board (m)
+
   // Canvas coordinate functions — same scale and Y-origin as side view so A aligns.
   //   Side view: OY = margin + CEIL_H*S + viewOY  →  cvY(y) = OY - y*S
   const fvAvailW = W / 2 - margin;
@@ -82,6 +90,14 @@ export function drawFrontView(W, H, margin, dpr, S) {
     }
   }
 
+  // Mid-frame: horizontal cross-member at main board midpoint, on backside
+  if (params.showBorderMark) {
+    const mfHy = AY_w - mfDist * Math.cos(rad);
+    const halfH_world = mfFrameH * Math.cos(rad) / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(cvX(0), cvY(mfHy + halfH_world), BOARD_W * S, cvY(mfHy - halfH_world) - cvY(mfHy + halfH_world));
+  }
+
   // ── Screw holes & grid cells ──
   if (params.showScrewHoles) {
     const rPx = Math.max(HOLE_R_M * S, 1.5 * dpr);
@@ -140,6 +156,13 @@ export function drawFrontView(W, H, margin, dpr, S) {
     divLines(MAIN_DIV_WIDTHS, cvY(AY_w), cvY(BY_w), 'rgba(196,137,74,0.45)');
     if (foldVisible)
       divLines(FOLD_DIV_WIDTHS, cvY(BY_w), cvY(DY_w), 'rgba(122,184,232,0.45)');
+
+    // Mid-frame centre dashed line (same style as vertical division lines)
+    const mfHy = AY_w - mfDist * Math.cos(rad);
+    ctx.strokeStyle = 'rgba(196,137,74,0.45)'; ctx.lineWidth = 1*dpr;
+    ctx.setLineDash([5*dpr, 4*dpr]);
+    ctx.beginPath(); ctx.moveTo(cvX(0), cvY(mfHy)); ctx.lineTo(cvX(BOARD_W), cvY(mfHy)); ctx.stroke();
+    ctx.setLineDash([]);
   }
 
   // ── Section labels ──
@@ -171,6 +194,10 @@ export function drawFrontView(W, H, margin, dpr, S) {
 
     // Main board height on right (label shows actual length MAIN_LEN)
     fvDimV(cvX(BOARD_W) + dimOff, cvY(AY_w), cvY(BY_w), MAIN_LEN.toFixed(3) + 'm', dpr, fs);
+
+    // Mid-frame centre to A-end distance (left side)
+    const mfHy = AY_w - mfDist * Math.cos(rad);
+    fvDimV(cvX(0) - dimOff, cvY(AY_w), cvY(mfHy), (mfDist * 100).toFixed(0) + 'cm', dpr, fs);
 
     // Fold height on right — only when fold has visible projected extent
     if (params.showFold && Math.abs(cvY(BY_w) - cvY(DY_w)) > 5 * dpr) {
