@@ -6,6 +6,8 @@
 #       its design spec (Spec/YYYYMMDD.design.md) in the same commit.
 # R3 — A newly created spec file must be introduced together with its
 #       counterpart (fn+design always created as a pair).
+# R4 — When both Spec/YYYYMMDD.md and Spec/YYYYMMDD.design.md are staged,
+#       their version numbers (「版本：X.Y」) must match.
 
 staged_code=$(git diff --cached --name-only | grep -E '^Code/')
 staged_spec=$(git diff --cached --name-only | grep -E '^Spec/')
@@ -45,6 +47,25 @@ for design in $new_design; do
   fn="${design%.design.md}.md"
   if ! echo "$new_fn" | grep -qF "$fn"; then
     echo "pre-commit [R3]: new design spec '$design' requires new function spec '$fn' in the same commit."
+    exit 1
+  fi
+done
+
+# ── R4 ────────────────────────────────────────────────────────────────────────
+# When both fn and design specs are staged, their version numbers must match.
+for fn in $staged_fn; do
+  design="${fn%.md}.design.md"
+  if ! git diff --cached --name-only | grep -qF "$design"; then
+    continue  # R2 already caught the missing pair; skip version check
+  fi
+
+  # Extract version from staged content (fall back to working tree if needed)
+  fn_ver=$(git show ":$fn" 2>/dev/null | grep -m1 '版本：' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+  ds_ver=$(git show ":$design" 2>/dev/null | grep -m1 '版本：' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+
+  if [ -n "$fn_ver" ] && [ -n "$ds_ver" ] && [ "$fn_ver" != "$ds_ver" ]; then
+    echo "pre-commit [R4]: version mismatch between '$fn' (v$fn_ver) and '$design' (v$ds_ver)."
+    echo "  Design spec version must match function spec version."
     exit 1
   fi
 done
