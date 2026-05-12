@@ -17,5 +17,4 @@ export const AX_W = BOARD_LEN * Math.sin(40 * Math.PI / 180); // 1.9593
 export const AY   = CEIL_H; // 2.5
 
 // Fixed reference points
-export const HX = 0, HY = CEIL_H;
 export const REF_IX = 0, REF_IY = AY - BOARD_LEN * Math.cos(40 * Math.PI / 180);
