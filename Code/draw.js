@@ -1,4 +1,4 @@
-import { BOARD_LEN, FOLD_LEN, MAIN_LEN, CEIL_H, T, T_FRAME, BOARD_W, HOLE_R_M, SCREW_Z, SCREW_U, CELL_Z, CELL_U, LABEL_RED, GRAY_DASH, FS, AX_W, AY, HX, HY, REF_IX, REF_IY, MAIN_DIV_WIDTHS, FOLD_DIV_WIDTHS } from './constants.js';
+import { BOARD_LEN, FOLD_LEN, MAIN_LEN, CEIL_H, T, T_FRAME, BOARD_W, HOLE_R_M, SCREW_Z, SCREW_U, CELL_Z, CELL_U, LABEL_RED, GRAY_DASH, FS, AX_W, AY, REF_IX, REF_IY, MAIN_DIV_WIDTHS, FOLD_DIV_WIDTHS } from './constants.js';
 import { canvas, ctx, params, view } from './state.js';
 import { getGeom } from './geometry.js';
 import { drawFrontView } from './frontview.js';
@@ -470,98 +470,41 @@ export function draw() {
     }
   }
 
-  // ── H→G dashed distance ──
+  // ── H→G dashed line (wall reference → fixed bracket) ──
   if(params.showQuarter){
     ctx.strokeStyle=GRAY_DASH+'66'; ctx.lineWidth=1.5*dpr;
     ctx.setLineDash([6*dpr,5*dpr]);
-    ctx.beginPath();ctx.moveTo(...p(HX,HY));ctx.lineTo(...p(g.GX,g.GY));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(...p(g.HX,g.HY));ctx.lineTo(...p(g.GX,g.GY));ctx.stroke();
     ctx.setLineDash([]);
 
-    // cosV≥0: z=BW is farther; cosV<0: z=0 is farther
-    const rodZFar  = cosV >= 0 ? BW : 0;
-    const rodZNear = cosV >= 0 ? 0  : BW;
-
-    if(params.show3D){
-      // Depth connector lines
-      ctx.strokeStyle='#90d8c055'; ctx.lineWidth=1.5*dpr; ctx.lineCap='round';
-      [[HX,HY],[g.MX,g.MY],[g.GX,g.GY]].forEach(([x,y])=>{
-        ctx.beginPath();ctx.moveTo(...p(x,y,0));ctx.lineTo(...p(x,y,BW));ctx.stroke();
-      });
-      addRod(HX,HY,g.MX,g.MY,      rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
-      addRod(g.MX,g.MY,g.GX,g.GY,  rodZFar,  6*dpr,'#6aac9a','#3a6d5a','#8ecfbc');
-    }
-    addRod(HX,HY,g.MX,g.MY,      rodZNear, 8*dpr,'#90d8c0','#508070','#c0f0e8');
-    addRod(g.MX,g.MY,g.GX,g.GY,  rodZNear, 8*dpr,'#90d8c0','#508070','#c0f0e8');
-
-    // ── Execute depth-sorted draw (boards + ghost + rods all together) ──
-    drawList.sort((a,b) => b.depth - a.depth);
-    drawList.forEach(e => e.drawFn());
-
-    // Length labels on front (z=0) H-M and M-G
-    {
-      const lfs = FS.dim * dpr;
-      ctx.font = `${lfs}px 'JetBrains Mono', monospace`;
-      ctx.textAlign = 'center';
-      const rigLbl = (g.LEN_HM * 100).toFixed(0) + 'cm';
-      // H-M midpoint (labels on the near/front rod set)
-      const [hm_mx, hm_my] = p((HX + g.MX) / 2, (HY + g.MY) / 2, rodZNear);
-      const tw_hm = ctx.measureText(rigLbl).width + 8 * dpr;
-      ctx.fillStyle = '#0e0f12'; ctx.fillRect(hm_mx - tw_hm/2, hm_my - lfs*0.85, tw_hm, lfs*1.3);
-      ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, hm_mx, hm_my + lfs*0.35);
-      // M-G midpoint (labels on the near/front rod set)
-      const [mg_mx, mg_my] = p((g.MX + g.GX) / 2, (g.MY + g.GY) / 2, rodZNear);
-      const tw_mg = ctx.measureText(rigLbl).width + 8 * dpr;
-      ctx.fillStyle = '#0e0f12'; ctx.fillRect(mg_mx - tw_mg/2, mg_my - lfs*0.85, tw_mg, lfs*1.3);
-      ctx.fillStyle = '#90d8c0'; ctx.fillText(rigLbl, mg_mx, mg_my + lfs*0.35);
-    }
-
-    ctx.setLineDash([]);
-    const mx=(HX+g.GX)/2, my=(HY+g.GY)/2;
+    // HG distance label at midpoint
     const fs=FS.dim*dpr;
     ctx.font=`${fs}px 'JetBrains Mono', monospace`;
     const lbl=(g.HG*100).toFixed(0)+'cm';
     const tw=ctx.measureText(lbl).width+8*dpr;
     ctx.textAlign='center';
-    const [hglx,hgly]=p(mx,my);
+    const [hglx,hgly]=p((g.HX+g.GX)/2,(g.HY+g.GY)/2);
     ctx.fillStyle='#0e0f12'; ctx.fillRect(hglx-tw/2,hgly-fs*0.85,tw,fs*1.3);
     ctx.fillStyle=GRAY_DASH; ctx.fillText(lbl,hglx,hgly+fs*0.35);
-
-    // ── G-H midpoint M → A dashed distance ──
-    function dashedDistLine(x1,y1,x2,y2,lbl,color){
-      ctx.strokeStyle=color; ctx.lineWidth=1.2*dpr;
-      ctx.setLineDash([5*dpr,4*dpr]);
-      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-      ctx.setLineDash([]);
-      const mx2=(x1+x2)/2, my2=(y1+y2)/2;
-      const tw2=ctx.measureText(lbl).width+8*dpr;
-      ctx.textAlign='center';
-      ctx.fillStyle='#0e0f12'; ctx.fillRect(mx2-tw2/2,my2-fs*0.85,tw2,fs*1.3);
-      ctx.fillStyle=color; ctx.fillText(lbl,mx2,my2+fs*0.35);
-    }
-    ctx.font=`${fs}px 'JetBrains Mono', monospace`;
-    dashedDistLine(...p(g.MX,g.MY), ...p(g.Aw.x,g.Aw.y),
-                   (g.MA*100).toFixed(0)+'cm', GRAY_DASH);
-  } else {
-    // No rods — still need to sort+draw boards, ghost, center line
-    drawList.sort((a,b) => b.depth - a.depth);
-    drawList.forEach(e => e.drawFn());
   }
 
-  // ── Anchor points H, I ──
-  drawDiamond(...p(HX,HY),'#7ae8b0','H',dpr);
+  // ── Execute depth-sorted draw (boards + ghost + center line) ──
+  drawList.sort((a,b) => b.depth - a.depth);
+  drawList.forEach(e => e.drawFn());
+
+  // ── Anchor points H (tracks A height on wall), I ──
+  drawDiamond(...p(g.HX,g.HY),'#7ae8b0','H',dpr);
   drawDiamond(...p(REF_IX,REF_IY),'#e8a87a','I',dpr);
 
-  // ── G point and M ──
+  // ── G point (fixed bracket) ──
   if(params.showQuarter){
     drawQuarterPt(...p(g.GX,g.GY),'G',dpr);
-    // A→G distance label near G
     const agLbl = (params.gOffset * 100).toFixed(0) + 'cm';
     ctx.font = `${FS.dim*dpr}px 'JetBrains Mono', monospace`;
     const [agx,agy]=p(g.GX,g.GY);
     ctx.fillStyle = '#c4894acc';
     ctx.textAlign = 'left';
     ctx.fillText('AG:' + agLbl, agx + 12*dpr, agy + 18*dpr);
-    drawMidPt(...p(g.MX,g.MY),'M',dpr);
   }
 
   // ── Key points A B C D ──
@@ -611,12 +554,12 @@ export function draw() {
 
     // ── H→B dashed distance ──
     {
-      const HB = Math.hypot(g.Bw.x - HX, g.Bw.y - HY);
+      const HB = Math.hypot(g.Bw.x - g.HX, g.Bw.y - g.HY);
       ctx.strokeStyle = GRAY_DASH + '88'; ctx.lineWidth = 1.2*dpr;
       ctx.setLineDash([5*dpr, 4*dpr]);
-      ctx.beginPath(); ctx.moveTo(...p(HX,HY)); ctx.lineTo(...p(g.Bw.x,g.Bw.y)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(...p(g.HX,g.HY)); ctx.lineTo(...p(g.Bw.x,g.Bw.y)); ctx.stroke();
       ctx.setLineDash([]);
-      const [hbx1,hby1]=p(HX,HY), [hbx2,hby2]=p(g.Bw.x,g.Bw.y);
+      const [hbx1,hby1]=p(g.HX,g.HY), [hbx2,hby2]=p(g.Bw.x,g.Bw.y);
       const hb_mx = (hbx1+hbx2)/2, hb_my = (hby1+hby2)/2;
       const hbLbl = (HB*100).toFixed(0)+'cm';
       const hb_tw = ctx.measureText(hbLbl).width + 8*dpr;
