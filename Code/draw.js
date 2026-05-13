@@ -1,4 +1,4 @@
-import { BOARD_LEN, FOLD_LEN, MAIN_LEN, CEIL_H, T, T_FRAME, BOARD_W, HOLE_R_M, SCREW_Z, SCREW_U, CELL_Z, CELL_U, LABEL_RED, GRAY_DASH, FS, AX_W, AY, REF_IX, REF_IY, MAIN_DIV_WIDTHS, FOLD_DIV_WIDTHS } from './constants.js';
+import { BOARD_LEN, FOLD_LEN, MAIN_LEN, CEIL_H, T, T_FRAME, BOARD_W, HOLE_R_M, SCREW_Z, SCREW_U, CELL_Z, CELL_U, LABEL_RED, GRAY_DASH, FS, AX_W, AY, MAIN_DIV_WIDTHS, FOLD_DIV_WIDTHS } from './constants.js';
 import { canvas, ctx, params, view } from './state.js';
 import { getGeom } from './geometry.js';
 import { drawFrontView } from './frontview.js';
@@ -431,17 +431,6 @@ export function draw() {
     }
   }
 
-  // Ghost C extension (dashed) — depth: front face of main board
-  const ghostDepth = (ptDepth(g.Bw.x,0) + ptDepth(g.Cw.x,0)) / 2;
-  drawList.push({ depth: ghostDepth, drawFn: () => {
-    ctx.setLineDash([5*dpr,5*dpr]); ctx.lineWidth=1*dpr;
-    ctx.strokeStyle='rgba(136,136,160,0.35)';
-    ctx.beginPath();ctx.moveTo(...p(g.Bw.x,g.Bw.y));ctx.lineTo(...p(g.Cw.x,g.Cw.y));ctx.stroke();
-    ctx.strokeStyle='rgba(136,136,160,0.2)';
-    ctx.beginPath();ctx.moveTo(...p(g.Bo.x,g.Bo.y));ctx.lineTo(...p(g.Co.x,g.Co.y));ctx.stroke();
-    ctx.setLineDash([]);
-  }});
-
   // ── Panel-face boundary line: panel (T) on outer face, frame (T_FRAME−T) on inner/back ──
   if (params.showDims) {
     const pnx = -g.ddy, pny = g.ddx; // main board outward normal
@@ -492,9 +481,8 @@ export function draw() {
   drawList.sort((a,b) => b.depth - a.depth);
   drawList.forEach(e => e.drawFn());
 
-  // ── Anchor points H (tracks A height on wall), I ──
+  // ── Anchor point H ──
   drawDiamond(...p(g.HX,g.HY),'#7ae8b0','H',dpr);
-  drawDiamond(...p(REF_IX,REF_IY),'#e8a87a','I',dpr);
 
   // ── G point (fixed bracket) ──
   if(params.showQuarter){
@@ -507,12 +495,11 @@ export function draw() {
     ctx.fillText('AG:' + agLbl, agx + 12*dpr, agy + 18*dpr);
   }
 
-  // ── Key points A B C D ──
+  // ── Key points A B; D as fixed anchor diamond ──
   drawKeyPt(...p(g.Aw.x,g.Aw.y), '#e8c87a','A', 16,-16,dpr);
   drawKeyPt(...p(g.Bw.x,g.Bw.y), '#7ab8e8','B', 16,  4,dpr);
-  drawKeyPt(...p(g.Cw.x,g.Cw.y), '#e87a7a','C', 16,  4,dpr);
   if(params.showFold)
-    drawKeyPt(...p(g.Dw.x,g.Dw.y),'#b07ae8','D', 16,  4,dpr);
+    drawDiamond(...p(g.Dw.x,g.Dw.y),'#b07ae8','D',dpr);
 
   // ── Dimension lines ──
   if(params.showDims){
@@ -572,10 +559,11 @@ export function draw() {
     dim(...p(g.Bw.x,0), ...p(g.Aw.x,0), ((g.Aw.x-g.Bw.x)*100).toFixed(0)+'cm','#c4894a', o, true);
     dim(...p(0,0), ...p(0,g.Bw.y), (g.Bw.y*100).toFixed(0)+'cm','#7ab8e8',-o*2, false);
 
+    // ── D 點到地面距離 ──
+    dim(...p(0,0), ...p(0,g.Dw.y), (g.Dw.y*100).toFixed(1)+'cm','#b07ae8',-o*3, false);
+
     dim(...p(0,0), ...p(0,CEIL_H), CEIL_H.toFixed(2)+'m','#7ab8e8',-o,false);
     dim(...p(0,CEIL_H+0.1), ...p(g.Aw.x,CEIL_H+0.1), g.Aw.x.toFixed(3)+'m','#e8c87a',-o,true);
-    if(g.Cw.y>0.002)
-      dim(...p(g.Cw.x-0.1,0), ...p(g.Cw.x-0.1,g.Cw.y), (g.Cw.y*100).toFixed(0)+'cm','#e87a7a',-o*0.75,false);
 
     // ── 地面外側端往內縮 → 主板外側面投影高度 ──
     if (g.projOnBoardY !== null) {

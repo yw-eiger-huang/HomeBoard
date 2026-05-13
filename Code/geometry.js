@@ -1,10 +1,12 @@
-import { MAIN_LEN, BOARD_LEN, FOLD_LEN, AX_W, AY, T_FRAME, HT } from './constants.js';
+import { MAIN_LEN, BOARD_LEN, FOLD_LEN, AX_W, AY, T_FRAME, HT, REF_IX, REF_IY } from './constants.js';
 import { params } from './state.js';
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
-// A slides along ceiling: A.x = BOARD_LEN·sinθ, A.y = CEIL_H.
-// This keeps the bottom wall-side edge (C) at x=0 for all angles.
-// At θ=40°: A.x = BOARD_LEN·sin40° = AX_W (matches baseline exactly).
+// D is fixed at I = (REF_IX, REF_IY) for all angles.
+// B.y is determined by the main board angle and ceiling position.
+// B.x is solved from |B→I| = FOLD_LEN: B.x = √(FOLD_LEN² − (I.y − B.y)²).
+// A stays on ceiling (A.y = CEIL_H) with A.x = B.x + MAIN_LEN·sinθ,
+// so A naturally slides toward H=(0,CEIL_H) as θ decreases.
 //
 // G is at gOffset from A along the board (moves with the board).
 // H is fixed at (0, CEIL_H) — the wall-ceiling corner.
@@ -14,15 +16,21 @@ export function getGeom() {
   const ddx = -Math.sin(rad), ddy = -Math.cos(rad);
   const mnx = Math.cos(rad), mny = -Math.sin(rad);
 
-  // A: slides on ceiling as angle changes
-  const Aw = { x: BOARD_LEN * Math.sin(rad), y: AY };
-  const Bw = { x: Aw.x + MAIN_LEN * ddx,  y: Aw.y + MAIN_LEN * ddy };
-  const Cw = { x: Aw.x + BOARD_LEN * ddx, y: Aw.y + BOARD_LEN * ddy }; // Cw.x = 0 always
+  // D: always fixed at I
+  const Dw = { x: REF_IX, y: REF_IY };
+
+  // B.y from main board angle; B.x from |B→I| = FOLD_LEN constraint
+  const Bwy = AY + MAIN_LEN * ddy;
+  const dy_BD = Dw.y - Bwy;
+  const Bwx = Math.sqrt(Math.max(0, FOLD_LEN * FOLD_LEN - dy_BD * dy_BD));
+  const Bw = { x: Bwx, y: Bwy };
+
+  // A: on ceiling, derived from B
+  const Aw = { x: Bwx - MAIN_LEN * ddx, y: AY };
 
   // Outer edge key points (main board)
   const Ao = { x: Aw.x + T_FRAME * mnx, y: Aw.y + T_FRAME * mny };
   const Bo = { x: Bw.x + T_FRAME * mnx, y: Bw.y + T_FRAME * mny };
-  const Co = { x: Cw.x + T_FRAME * mnx, y: Cw.y + T_FRAME * mny };
 
   // Center line points
   const Ac = { x: Aw.x + HT * mnx, y: Aw.y + HT * mny };
@@ -30,13 +38,12 @@ export function getGeom() {
 
   const boardDir = Math.atan2(ddy, ddx);
 
-  // Fold: rigid rectangle around B_w — synced with wall angle
-  const foldRad = Math.PI * (40 - params.angle) / 35;
-  const foldDir = boardDir - foldRad;
-  const fdx = Math.cos(foldDir), fdy = Math.sin(foldDir);
+  // Fold: direction B→D (D fixed at I), length always FOLD_LEN
+  const fdx = (Dw.x - Bw.x) / FOLD_LEN;
+  const fdy = (Dw.y - Bw.y) / FOLD_LEN;
+  const foldDir = Math.atan2(fdy, fdx);
   let fnx = -fdy, fny = fdx;
 
-  const Dw  = { x: Bw.x + FOLD_LEN * fdx, y: Bw.y + FOLD_LEN * fdy };
   const Do  = { x: Dw.x + T_FRAME * fnx,  y: Dw.y + T_FRAME * fny };
   const Bfo = { x: Bw.x + T_FRAME * fnx,  y: Bw.y + T_FRAME * fny };
 
@@ -53,12 +60,12 @@ export function getGeom() {
   const t_proj = (Ao.x - Bo.x) > 0.001 ? (refFloorX - Bo.x) / (Ao.x - Bo.x) : -1;
   const projOnBoardY = (t_proj >= 0 && t_proj <= 1) ? Bo.y + t_proj * (Ao.y - Bo.y) : null;
 
-  return { Aw,Ao,Ac, Bw,Bo,Bc,Bfo, Cw,Co, Dw,Do,
+  return { Aw,Ao,Ac, Bw,Bo,Bc,Bfo, Dw,Do,
            boardDir, foldDir, fdx,fdy, fnx,fny, ddx,ddy,
            GX,GY, HX,HY, HG,
            refFloorX, projOnBoardY };
 }
 
 // ── Clamp logic ──────────────────────────────────────────────────────────────
-// angle: 0~40 (no further constraints needed — at 0° board is vertical against wall)
-export function clampAngle(a) { return Math.min(Math.max(a, 5), 40); }
+// angle: 0~40
+export function clampAngle(a) { return Math.min(Math.max(a, 0), 40); }
