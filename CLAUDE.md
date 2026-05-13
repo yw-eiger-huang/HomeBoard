@@ -48,12 +48,12 @@ Hosted on **GitHub Pages** at:
 
 ## Working Rules
 
-- **Do not commit or push** unless explicitly asked by the user.
+- **Do not commit or push** unless explicitly asked by the user. "merge to main" does NOT imply push — push requires a separate, explicit instruction.
 - **When committing**, only include files that were modified, added, or deleted during the current session. Do not stage or commit files changed outside of the session.
 - **Never switch branches** when `Code/` has uncommitted changes. Commit or stash first.
 - **When updating the spec**, ask the user whether to create a new dated file or update the existing highest-dated file.
 - **Spec file**: Always refer to the highest-dated `.md` file in `Spec/` as the authoritative specification. Do not use an older dated file unless the user explicitly specifies one.
-- **When starting a new session**, read both the latest function spec (`Spec/YYYYMMDD.md`) and the latest design spec (`Spec/YYYYMMDD.design.md`) to understand the current state of the project. Do not rely on memory or prior context alone.
+- **When starting a coding task**, read both the latest function spec (`Spec/YYYYMMDD.md`) and the latest design spec (`Spec/YYYYMMDD.design.md`) to understand the current state of the project. Do not rely on memory or prior context alone.
 - **When creating a new spec file**, write the content in a polished and compacted style: use `|·|` notation for distances, merge subsections that share the same structure, avoid repeating formulas already stated elsewhere (cross-reference instead), and remove verbose CSS/implementation detail in favor of concise prose or tables.
 - **Spec files must be self-contained (flat)**: never write lines like `承 vX.Y（Spec/YYYYMMDD.md）` or `§N–§M 同 vX.Y，不重複` that defer content to another dated file. Every spec file must include all its content inline. Exception: a design spec may reference its function spec of the same date (e.g. `對應功能規格：v4.4（Spec/20260421.md）` or cross-referencing a section within the same date's function spec).
 - **Design spec version must match function spec version**: when the function spec carries version `vX.Y`, its paired `YYYYMMDD.design.md` must also declare `版本：X.Y`. The pre-commit hook (R4) enforces this.
